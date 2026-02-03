@@ -120,7 +120,7 @@ export default function DeliveryPrices() {
           </div>
 
           {/* Search Box */}
-          {selectedOrigin && routeDetails && (
+          {selectedOrigin && (
             <div className="space-y-2">
               <Label className="text-sm text-[#666]">بحث عن وجهة</Label>
               <div className="relative">

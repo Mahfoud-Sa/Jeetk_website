@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { Location, DeliveryRoute } from "@/types/delivery"
+import { Location, DeliveryRoute, RouteLocation } from "@/types/delivery"
 
 const API_BASE = "http://jeetk-api.runasp.net/api"
 
@@ -16,6 +16,44 @@ const fallbackLocations: Location[] = [
   { id: 2, name: "موقع افتراضي 2 (تجريبي)", routeLocations: [{ deliveryRouteId: 103, name: "طريق 3" }] }
 ]
 
+const normalizeRouteLocation = (routeLocation: any): RouteLocation => {
+  const deliveryRoute = routeLocation.deliveryRoute ?? routeLocation.DeliveryRoute
+  return {
+    id: routeLocation.id ?? routeLocation.Id,
+    deliveryRouteId:
+      routeLocation.deliveryRouteId ??
+      routeLocation.DeliveryRouteId ??
+      routeLocation.routeId ??
+      routeLocation.RouteId ??
+      deliveryRoute?.id ??
+      deliveryRoute?.Id ??
+      0,
+    name: routeLocation.name ?? routeLocation.Name ?? deliveryRoute?.name ?? deliveryRoute?.Name,
+    deliveryRoute: deliveryRoute
+      ? {
+          id: deliveryRoute.id ?? deliveryRoute.Id,
+          name: deliveryRoute.name ?? deliveryRoute.Name,
+          deliveryPrice: deliveryRoute.deliveryPrice ?? deliveryRoute.DeliveryPrice,
+        }
+      : undefined,
+  }
+}
+
+const normalizeLocation = (location: any): Location => {
+  const rawRoutes =
+    location.routeLocations ??
+    location.RouteLocations ??
+    location.deliveryRoutes ??
+    location.DeliveryRoutes ??
+    []
+
+  return {
+    id: location.id ?? location.Id ?? location.locationId ?? location.LocationId,
+    name: location.name ?? location.Name,
+    routeLocations: Array.isArray(rawRoutes) ? rawRoutes.map(normalizeRouteLocation) : [],
+  }
+}
+
 // Fetch all locations for the origin dropdown
 export function useLocations() {
   return useQuery<Location[]>({
@@ -24,7 +62,8 @@ export function useLocations() {
       try {
         const data = await fetchWithProxy<Location[] | { value: Location[] }>(`${API_BASE}/Locations`)
         const locations = Array.isArray(data) ? data : (data.value || [])
-        return locations.length > 0 ? locations : fallbackLocations
+        const normalizedLocations = locations.map(normalizeLocation)
+        return normalizedLocations.length > 0 ? normalizedLocations : fallbackLocations
       } catch {
         console.warn("Using fallback locations")
         return fallbackLocations
