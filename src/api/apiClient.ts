@@ -19,7 +19,7 @@ export interface ApiErrorResponse {
  * Create and configure Axios instance
  */
 const apiClient: AxiosInstance = axios.create({
-  baseURL: "http://jeetk-api.runasp.net/api",
+  baseURL: "https://jeetk-api.runasp.net/api",
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",
@@ -66,7 +66,7 @@ apiClient.interceptors.request.use(
   },
   (error: AxiosError) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 /**
@@ -130,7 +130,7 @@ apiClient.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default apiClient;
