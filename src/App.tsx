@@ -621,10 +621,13 @@ const LocationsPage = () => {
             <div key={loc.id} className="group bg-white border border-zinc-100 rounded-3xl overflow-hidden hover:shadow-xl transition-all flex flex-col">
               <div className="relative aspect-video overflow-hidden">
                 <img 
-                  src={loc.image || `https://picsum.photos/seed/${loc.id}/800/600`} 
+                  src={loc.image || 'https://picsum.photos/seed/jeetk-location/800/600'} 
                   alt={loc.name} 
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/jeetk-placeholder/800/600';
+                  }}
                 />
               </div>
               <div className="p-6 flex-1 flex flex-col">
