@@ -17,8 +17,9 @@ import {
   CheckCircle2,
   Sparkles
 } from 'lucide-react';
-import { RESTAURANTS, MENU_ITEMS, LOCATIONS, DELIVERY_ROUTES } from './constants';
+import { RESTAURANTS, MENU_ITEMS } from './constants';
 import { Restaurant, MenuItem, CartItem, Order, Location, LocationRequest, DeliveryRoute } from './types';
+import { useLocations, useDeliveryRoute } from './services/deliveryService';
 import { GoogleGenAI } from "@google/genai";
 
 const ScrollToTop = () => {
@@ -35,10 +36,10 @@ const Navbar = ({ cartCount }: { cartCount: number }) => (
   <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-black/5">
     <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
       <Link to="/" className="text-2xl font-bold tracking-tighter flex items-center gap-2">
-        <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
           <Navigation className="w-5 h-5 text-white" />
         </div>
-        <span>Jeetk</span>
+        <span className="logo-gradient">Jeetk</span>
       </Link>
       
       <div className="hidden md:flex items-center gap-2 bg-zinc-100 px-3 py-1.5 rounded-full text-sm font-medium">
@@ -50,8 +51,8 @@ const Navbar = ({ cartCount }: { cartCount: number }) => (
         <Link to="/locations" className="text-sm font-medium hover:text-black transition-colors hidden sm:block">
           Locations
         </Link>
-        <Link to="/routes" className="text-sm font-medium hover:text-black transition-colors hidden sm:block">
-          Routes
+        <Link to="/routes" className="text-sm font-medium hover:text-primary transition-colors hidden sm:block">
+          Delivery Prices
         </Link>
         <button className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
           <Search className="w-5 h-5" />
@@ -208,27 +209,65 @@ const HomePage = () => {
 
       {/* Hero Section */}
       {!searchQuery && (
-        <section className="mb-12">
-          <div className="relative h-[300px] md:h-[400px] rounded-3xl overflow-hidden bg-zinc-900">
-            <img 
-              src="https://picsum.photos/seed/hero/1920/1080?blur=2" 
-              alt="Hero"
-              className="w-full h-full object-cover opacity-60"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 flex flex-col justify-center px-8 md:px-16">
-              <h1 className="text-4xl md:text-6xl font-bold text-white tracking-tight mb-4 max-w-2xl">
-                Cravings delivered <br />to your doorstep.
-              </h1>
-              <div className="flex gap-4">
-                <button className="bg-white text-black px-8 py-3 rounded-full font-semibold hover:bg-zinc-100 transition-colors">
-                  Order Now
-                </button>
-              </div>
+        <section className="py-20 md:py-32 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 hero-gradient-text">
+              Cravings delivered <br className="hidden md:block" /> to your doorstep.
+            </h1>
+            <p className="text-zinc-500 text-lg md:text-xl max-w-2xl mx-auto mb-10">
+              The fastest way to get your favorite food from the best local restaurants, 
+              delivered with precision and care.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button className="bg-primary text-white px-10 py-4 rounded-full font-bold hover:scale-105 transition-transform shadow-lg shadow-primary/25">
+                Order Now
+              </button>
+              <Link to="/routes" className="bg-white text-black border border-zinc-200 px-10 py-4 rounded-full font-bold hover:bg-zinc-50 transition-colors">
+                Check Delivery Prices
+              </Link>
             </div>
-          </div>
+          </motion.div>
         </section>
       )}
+
+      {/* Features Section */}
+      <section className="py-20 border-t border-zinc-100">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">Why choose Jeetk?</h2>
+          <p className="text-zinc-500">Experience the next generation of food delivery.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {[
+            { 
+              title: 'Lightning Fast', 
+              desc: 'Average delivery time of 25 minutes. We don\'t just deliver; we sprint.',
+              icon: Clock
+            },
+            { 
+              title: 'AI Suggestions', 
+              desc: 'Not sure what to eat? Our AI knows your taste better than you do.',
+              icon: Sparkles
+            },
+            { 
+              title: 'Transparent Pricing', 
+              desc: 'No hidden fees. Check delivery prices between any two points instantly.',
+              icon: Navigation
+            }
+          ].map((feature, i) => (
+            <div key={i} className="p-10 rounded-3xl border border-zinc-100 bg-white hover:border-primary hover:-translate-y-2 transition-all duration-300 group">
+              <div className="w-14 h-14 bg-zinc-50 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-primary/10 transition-colors">
+                <feature.icon className="w-7 h-7 text-zinc-400 group-hover:text-primary transition-colors" />
+              </div>
+              <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
+              <p className="text-zinc-500 leading-relaxed">{feature.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Promotions Bento Grid */}
       {!searchQuery && (
@@ -505,7 +544,10 @@ const LocationsPage = () => {
   ]);
   const [newRequest, setNewRequest] = useState({ name: '', address: '' });
 
-  const filteredLocations = LOCATIONS.filter(loc => 
+  const { data: locationsData = [], isLoading } = useLocations();
+  const locations = Array.isArray(locationsData) ? locationsData : [];
+
+  const filteredLocations = locations.filter(loc => 
     loc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     loc.address.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -530,6 +572,15 @@ const LocationsPage = () => {
     setNewRequest({ name: '', address: '' });
     alert('Location request sent! It will be added once an admin approves it.');
   };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-20 text-center">
+        <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p className="text-zinc-500">Loading locations...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -562,15 +613,15 @@ const LocationsPage = () => {
       {/* Locations Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20">
         {filteredLocations.map(loc => {
-          const routes = DELIVERY_ROUTES.filter(r => r.origin === loc.name);
           const isExpanded = expandedLocations[loc.id];
-          const displayedRoutes = isExpanded ? routes : routes.slice(0, 2);
-
+          // Note: In a real app, we might fetch routes per location or have them nested
+          // For now, we'll show the location details.
+          
           return (
             <div key={loc.id} className="group bg-white border border-zinc-100 rounded-3xl overflow-hidden hover:shadow-xl transition-all flex flex-col">
               <div className="relative aspect-video overflow-hidden">
                 <img 
-                  src={loc.image} 
+                  src={loc.image || `https://picsum.photos/seed/${loc.id}/800/600`} 
                   alt={loc.name} 
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   referrerPolicy="no-referrer"
@@ -583,7 +634,7 @@ const LocationsPage = () => {
                   {loc.address}
                 </p>
                 <a 
-                  href={loc.googleMapsUrl} 
+                  href={loc.googleMapsUrl || `https://www.google.com/maps/search/${encodeURIComponent(loc.address)}`} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-sm font-bold text-black hover:underline mb-6"
@@ -591,39 +642,6 @@ const LocationsPage = () => {
                   View on Google Maps
                   <ChevronRight className="w-4 h-4" />
                 </a>
-
-                {/* Delivery Routes Section */}
-                <div className="mt-auto pt-4 border-t border-zinc-100">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Delivery Routes</h4>
-                    <Navigation className="w-3 h-3 text-zinc-400" />
-                  </div>
-                  
-                  {routes.length > 0 ? (
-                    <div className="space-y-2">
-                      {displayedRoutes.map(route => (
-                        <div key={route.id} className="flex justify-between items-center text-sm">
-                          <span className="text-zinc-600 flex items-center gap-1">
-                            to {route.destination}
-                            {!route.isAvailable && <span className="w-1.5 h-1.5 bg-red-500 rounded-full" title="Unavailable" />}
-                          </span>
-                          <span className="font-bold">${route.price.toFixed(2)}</span>
-                        </div>
-                      ))}
-                      
-                      {routes.length > 2 && (
-                        <button 
-                          onClick={() => toggleLocation(loc.id)}
-                          className="text-xs font-bold text-black mt-2 hover:underline flex items-center gap-1"
-                        >
-                          {isExpanded ? 'Show Less' : `Show All (${routes.length})`}
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-zinc-400 italic">No routes available from this hub.</p>
-                  )}
-                </div>
               </div>
             </div>
           );
@@ -634,6 +652,7 @@ const LocationsPage = () => {
           </div>
         )}
       </div>
+
 
       {/* Request Modal */}
       <AnimatePresence>
@@ -722,20 +741,25 @@ const LocationsPage = () => {
 
 const DeliveryRoutesPage = () => {
   const [originSearch, setOriginSearch] = useState('');
-  const [selectedOrigin, setSelectedOrigin] = useState<string | null>(null);
+  const [selectedOriginId, setSelectedOriginId] = useState<string | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<DeliveryRoute | null>(null);
 
-  const origins = Array.from(new Set(DELIVERY_ROUTES.map(r => r.origin)));
-  const filteredOrigins = origins.filter(o => o.toLowerCase().includes(originSearch.toLowerCase()));
+  const { data: locationsData = [], isLoading: isLoadingLocations } = useLocations();
+  const { data: routesData = [], isLoading: isLoadingRoutes } = useDeliveryRoute(selectedOriginId);
 
-  const availableRoutes = selectedOrigin 
-    ? DELIVERY_ROUTES.filter(r => r.origin === selectedOrigin)
-    : [];
+  const locations = Array.isArray(locationsData) ? locationsData : [];
+  const availableRoutes = Array.isArray(routesData) ? routesData : [];
+
+  const filteredLocations = locations.filter(loc => 
+    loc.name.toLowerCase().includes(originSearch.toLowerCase())
+  );
+
+  const selectedOrigin = locations.find(l => l.id === selectedOriginId);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-12">
-        <h1 className="text-3xl font-bold mb-2">Delivery Routes</h1>
+        <h1 className="text-3xl font-bold mb-2">Delivery Prices</h1>
         <p className="text-zinc-500">Check delivery prices and availability between locations.</p>
       </div>
 
@@ -756,29 +780,33 @@ const DeliveryRoutesPage = () => {
                 value={originSearch}
                 onChange={(e) => {
                   setOriginSearch(e.target.value);
-                  setSelectedOrigin(null);
+                  setSelectedOriginId(null);
                   setSelectedRoute(null);
                 }}
               />
             </div>
             <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-              {filteredOrigins.map(origin => (
-                <button
-                  key={origin}
-                  onClick={() => {
-                    setSelectedOrigin(origin);
-                    setSelectedRoute(null);
-                  }}
-                  className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${
-                    selectedOrigin === origin 
-                      ? 'bg-black text-white font-bold' 
-                      : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700'
-                  }`}
-                >
-                  {origin}
-                </button>
-              ))}
-              {filteredOrigins.length === 0 && (
+              {isLoadingLocations ? (
+                <p className="text-xs text-zinc-400 text-center py-4">Loading locations...</p>
+              ) : (
+                filteredLocations.map(loc => (
+                  <button
+                    key={loc.id}
+                    onClick={() => {
+                      setSelectedOriginId(loc.id);
+                      setSelectedRoute(null);
+                    }}
+                    className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${
+                      selectedOriginId === loc.id 
+                        ? 'bg-primary text-white font-bold' 
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700'
+                    }`}
+                  >
+                    {loc.name}
+                  </button>
+                ))
+              )}
+              {!isLoadingLocations && filteredLocations.length === 0 && (
                 <p className="text-xs text-zinc-400 text-center py-4">No origins found.</p>
               )}
             </div>
@@ -787,13 +815,17 @@ const DeliveryRoutesPage = () => {
 
         {/* Destination Selection */}
         <div className="lg:col-span-1">
-          <div className={`bg-white border border-zinc-100 rounded-3xl p-6 shadow-sm transition-opacity ${!selectedOrigin ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+          <div className={`bg-white border border-zinc-100 rounded-3xl p-6 shadow-sm transition-opacity ${!selectedOriginId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
             <h3 className="font-bold mb-4 flex items-center gap-2">
               <Navigation className="w-5 h-5" />
               2. Select Destination
             </h3>
-            {!selectedOrigin ? (
+            {!selectedOriginId ? (
               <p className="text-sm text-zinc-400 py-8 text-center">Please select an origin first.</p>
+            ) : isLoadingRoutes ? (
+              <p className="text-sm text-zinc-400 py-8 text-center">Loading routes...</p>
+            ) : availableRoutes.length === 0 ? (
+              <p className="text-sm text-zinc-400 py-8 text-center">No routes available from this origin.</p>
             ) : (
               <div className="space-y-2">
                 {availableRoutes.map(route => (
@@ -802,7 +834,7 @@ const DeliveryRoutesPage = () => {
                     onClick={() => setSelectedRoute(route)}
                     className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex justify-between items-center ${
                       selectedRoute?.id === route.id 
-                        ? 'bg-black text-white font-bold' 
+                        ? 'bg-primary text-white font-bold' 
                         : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700'
                     }`}
                   >
@@ -844,7 +876,7 @@ const DeliveryRoutesPage = () => {
                 </div>
                 
                 {selectedRoute.isAvailable ? (
-                  <button className="w-full bg-black text-white py-4 rounded-2xl font-bold mt-4 hover:scale-[1.02] transition-transform">
+                  <button className="w-full bg-primary text-white py-4 rounded-2xl font-bold mt-4 hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20">
                     Start Order from this Route
                   </button>
                 ) : (
@@ -857,44 +889,10 @@ const DeliveryRoutesPage = () => {
           </div>
         </div>
       </div>
-
-      {/* All Routes Table (Optional/Secondary) */}
-      <div className="mt-20">
-        <h2 className="text-2xl font-bold mb-6">All Active Routes</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-zinc-100">
-                <th className="py-4 font-bold text-sm text-zinc-500">Origin</th>
-                <th className="py-4 font-bold text-sm text-zinc-500">Destination</th>
-                <th className="py-4 font-bold text-sm text-zinc-500">Distance</th>
-                <th className="py-4 font-bold text-sm text-zinc-500">Price</th>
-                <th className="py-4 font-bold text-sm text-zinc-500">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {DELIVERY_ROUTES.map(route => (
-                <tr key={route.id} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
-                  <td className="py-4 text-sm font-medium">{route.origin}</td>
-                  <td className="py-4 text-sm">{route.destination}</td>
-                  <td className="py-4 text-sm text-zinc-500">{route.distance}</td>
-                  <td className="py-4 text-sm font-bold">${route.price.toFixed(2)}</td>
-                  <td className="py-4">
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
-                      route.isAvailable ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {route.isAvailable ? 'Available' : 'Unavailable'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 };
+
 
 // --- Main App ---
 
@@ -944,10 +942,10 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="col-span-1 md:col-span-2">
               <div className="text-2xl font-bold tracking-tighter flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
                   <Navigation className="w-5 h-5 text-white" />
                 </div>
-                <span>Jeetk</span>
+                <span className="logo-gradient">Jeetk</span>
               </div>
               <p className="text-zinc-500 max-w-sm">
                 The fastest way to get your favorite food delivered. We partner with the best local restaurants to bring you quality meals.
@@ -958,7 +956,7 @@ export default function App() {
               <ul className="space-y-2 text-zinc-500 text-sm">
                 <li><Link to="/">Home</Link></li>
                 <li><Link to="/locations">Locations</Link></li>
-                <li><Link to="/routes">Delivery Routes</Link></li>
+                <li><Link to="/routes">Delivery Prices</Link></li>
                 <li><Link to="/cart">Cart</Link></li>
                 <li><Link to="/tracking">Track Order</Link></li>
               </ul>

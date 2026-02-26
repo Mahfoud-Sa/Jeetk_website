@@ -4,4 +4,35 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-primary: hsl(207 90% 54%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(210 40% 96%);
+  --color-accent: hsl(210 40% 96%);
+  --color-muted: hsl(210 40% 96%);
+  --color-muted-foreground: hsl(210 40% 40%);
+  --color-border: hsl(0 0% 88%);
+}
+
+:root {
+  --glass: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.1);
+}
+
+body {
+  background-color: #F8F9FA;
+}
+
+.hero-gradient-text {
+  background: linear-gradient(to bottom, #1a1a1a, #666);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.logo-gradient {
+  background: linear-gradient(135deg, #3b82f6, #60a5fa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
