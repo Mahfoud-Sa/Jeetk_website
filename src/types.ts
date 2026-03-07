@@ -56,3 +56,18 @@ export interface Order {
   status: OrderStatus;
   timestamp: Date;
 }
+
+export interface User {
+  id: number;
+  name: string;
+  birthDate: string;
+  email: string;
+  password?: string;
+  phoneNumber: string;
+  address: string;
+  username: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  role?: string;
+}

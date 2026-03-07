@@ -26,21 +26,35 @@ import {
   Lock,
   LogIn,
   LogOut,
-  Globe
+  Globe,
+  Mail,
+  Image as ImageIcon,
+  User,
+  ClipboardList,
+  UserPlus
 } from 'lucide-react';
 import { RESTAURANTS, MENU_ITEMS } from './constants';
 import { Restaurant, MenuItem, CartItem, Order, Location, LocationRequest, DeliveryRoute } from './types';
 import { translations, Language } from './i18n';
 import { 
   useLocations, 
-  useDeliveryRoute,
   createLocation,
   updateLocation,
   deleteLocation,
+} from './services/locationService';
+import {
+  useDeliveryRoute,
   createDeliveryRoute,
   updateDeliveryRoute,
   deleteDeliveryRoute
-} from './services/deliveryService';
+} from './services/routeService';
+import {
+  useUsers,
+  createUser,
+  updateUser,
+  deleteUser
+} from './services/userService';
+import { login, setToken } from './services/authService';
 import { GoogleGenAI } from "@google/genai";
 
 interface LanguageContextType {
@@ -136,6 +150,9 @@ const Navbar = ({ cartCount, isAuthenticated }: {
 
           <Link to="/locations" className="text-sm font-medium hover:text-black transition-colors hidden sm:block">
             {t.nav.locations}
+          </Link>
+          <Link to="/restaurants" className="text-sm font-medium hover:text-black transition-colors hidden sm:block">
+            {t.nav.restaurants}
           </Link>
           <Link to="/routes" className="text-sm font-medium hover:text-primary transition-colors hidden sm:block">
             {t.nav.deliveryPrices}
@@ -426,12 +443,19 @@ const HomePage = () => {
 
       {/* Featured Restaurants */}
       <section>
-        <h2 className="text-2xl font-bold mb-6">
-          {searchQuery ? `Search results for "${searchQuery}"` : 'Featured Restaurants'}
-        </h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold">
+            {searchQuery ? `Search results for "${searchQuery}"` : t.home.featuredRestaurants}
+          </h2>
+          {!searchQuery && (
+            <Link to="/restaurants" className="text-sm font-medium flex items-center gap-1 hover:underline">
+              {t.home.viewAll} <ChevronRight className="w-4 h-4" />
+            </Link>
+          )}
+        </div>
         {filteredRestaurants.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredRestaurants.map(res => (
+            {filteredRestaurants.slice(0, searchQuery ? undefined : 3).map(res => (
               <RestaurantCard key={res.id} restaurant={res} />
             ))}
           </div>
@@ -441,6 +465,49 @@ const HomePage = () => {
           </div>
         )}
       </section>
+    </div>
+  );
+};
+
+const RestaurantsPage = () => {
+  const { t } = useLanguage();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredRestaurants = RESTAURANTS.filter(res => 
+    res.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    res.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="mb-12">
+        <h1 className="text-4xl font-bold mb-4">{t.home.allRestaurants}</h1>
+        <p className="text-zinc-500">Browse all restaurants available on Jeetk.</p>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative mb-12">
+        <Search className="absolute start-4 top-1/2 -translate-y-1/2 text-zinc-400 w-5 h-5" />
+        <input 
+          type="text" 
+          placeholder={t.home.searchPlaceholder}
+          className="w-full ps-12 pe-4 py-4 bg-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-black/5 transition-all"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        {filteredRestaurants.map(res => (
+          <RestaurantCard key={res.id} restaurant={res} />
+        ))}
+      </div>
+
+      {filteredRestaurants.length === 0 && (
+        <div className="text-center py-20 bg-zinc-50 rounded-3xl">
+          <p className="text-zinc-500">No restaurants found matching your search.</p>
+        </div>
+      )}
     </div>
   );
 };
@@ -1005,20 +1072,50 @@ const DeliveryRoutesPage = () => {
 };
 
 
-const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
+export type UserRole = 'admin' | 'owner' | 'delivery' | 'pharmacy' | 'hotel' | 'family';
+
+interface AuthState {
+  isAuthenticated: boolean;
+  role: UserRole | null;
+  userEmail: string | null;
+}
+
+const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string) => void }) => {
+  const { t, language } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // Simple mock authentication
-    if (email === 'binsabbah2013@gmail.com' && password === '123456789') {
-      onLogin();
+    setError('');
+    setIsLoading(true);
+    
+    try {
+      const response = await login({ email, password });
+      
+      // If the API returns a token, store it
+      if (response && (response as any).token) {
+        setToken((response as any).token);
+      }
+      
+      // For now, we'll still use the mock role logic based on email 
+      // until the API returns user roles
+      if (email === 'binsabbah2013@gmail.com') {
+        onLogin('admin', email);
+      } else {
+        onLogin('owner', email);
+      }
+      
       navigate('/dashboard');
-    } else {
-      setError('Invalid email or password. Hint: binsabbah2013@gmail.com / 123456789');
+    } catch (err: any) {
+      console.error("Login error:", err);
+      const errorMsg = err.response?.data?.message || err.message || (language === 'ar' ? 'فشل تسجيل الدخول.' : 'Login failed.');
+      setError(errorMsg);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1033,13 +1130,13 @@ const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
           <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Lock className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold">Admin Login</h1>
-          <p className="text-zinc-500 text-sm">Enter your credentials to access the dashboard</p>
+          <h1 className="text-2xl font-bold">{t.nav.login}</h1>
+          <p className="text-zinc-500 text-sm">{language === 'ar' ? 'أدخل بيانات الاعتماد الخاصة بك للوصول إلى لوحة التحكم' : 'Enter your credentials to access the dashboard'}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-bold mb-1.5 ml-1">Email Address</label>
+            <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'البريد الإلكتروني' : 'Email Address'}</label>
             <input 
               type="email" 
               className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
@@ -1047,10 +1144,11 @@ const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={isLoading}
             />
           </div>
           <div>
-            <label className="block text-sm font-bold mb-1.5 ml-1">Password</label>
+            <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'كلمة المرور' : 'Password'}</label>
             <input 
               type="password" 
               className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
@@ -1058,6 +1156,7 @@ const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={isLoading}
             />
           </div>
           
@@ -1067,10 +1166,15 @@ const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
 
           <button 
             type="submit" 
-            className="w-full bg-black text-white py-4 rounded-xl font-bold hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
+            disabled={isLoading}
+            className="w-full bg-black text-white py-4 rounded-xl font-bold hover:scale-[1.02] transition-transform flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <LogIn className="w-5 h-5" />
-            Sign In
+            {isLoading ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <LogIn className="w-5 h-5" />
+            )}
+            {t.nav.login}
           </button>
         </form>
       </motion.div>
@@ -1078,28 +1182,1476 @@ const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
   );
 };
 
+const OrderManagement = ({ role, orders, onUpdateStatus }: { role: UserRole, orders: any[], onUpdateStatus: (id: number, status: string) => void }) => {
+  const { t } = useLanguage();
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-amber-100 text-amber-700';
+      case 'preparing': return 'bg-blue-100 text-blue-700';
+      case 'onTheWay': return 'bg-indigo-100 text-indigo-700';
+      case 'delivered': return 'bg-emerald-100 text-emerald-700';
+      case 'cancelled': return 'bg-red-100 text-red-700';
+      default: return 'bg-zinc-100 text-zinc-700';
+    }
+  };
+
+  return (
+    <div className="bg-white border border-zinc-100 rounded-3xl overflow-hidden shadow-sm">
+      <table className="w-full text-left">
+        <thead>
+          <tr className="bg-zinc-50 border-b border-zinc-100">
+            <th className="px-6 py-4 font-bold text-sm">{t.dashboard.orderId}</th>
+            <th className="px-6 py-4 font-bold text-sm">{t.dashboard.customer}</th>
+            <th className="px-6 py-4 font-bold text-sm">{t.dashboard.date}</th>
+            <th className="px-6 py-4 font-bold text-sm">{t.dashboard.status}</th>
+            <th className="px-6 py-4 font-bold text-sm text-right">{t.common.total}</th>
+            <th className="px-6 py-4 font-bold text-sm text-right">{t.dashboard.updateStatus}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-50">
+          {orders.map((order) => (
+            <tr key={order.id} className="hover:bg-zinc-50/50 transition-colors">
+              <td className="px-6 py-4 text-sm font-bold">#ORD-{order.id.toString().padStart(4, '0')}</td>
+              <td className="px-6 py-4 text-sm">{order.customer}</td>
+              <td className="px-6 py-4 text-sm text-zinc-500">{order.date}</td>
+              <td className="px-6 py-4">
+                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusColor(order.status)}`}>
+                  {(t.dashboard as any)[order.status] || order.status}
+                </span>
+              </td>
+              <td className="px-6 py-4 text-sm font-bold text-right">${order.total.toFixed(2)}</td>
+              <td className="px-6 py-4 text-right">
+                <select 
+                  className="text-xs font-bold bg-zinc-50 border border-zinc-100 rounded-lg px-2 py-1 focus:outline-none"
+                  value={order.status}
+                  onChange={(e) => onUpdateStatus(order.id, e.target.value)}
+                >
+                  <option value="pending">{t.dashboard.pending}</option>
+                  <option value="preparing">{t.dashboard.preparing}</option>
+                  <option value="onTheWay">{t.dashboard.onTheWay}</option>
+                  <option value="delivered">{t.dashboard.delivered}</option>
+                  <option value="cancelled">{t.dashboard.cancelled}</option>
+                </select>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {orders.length === 0 && (
+        <div className="p-12 text-center">
+          <p className="text-zinc-400 font-medium">No orders found.</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOriginId, handleCreateLocation, handleDeleteLocation, handleUpdateLocation, handleCreateRoute, handleDeleteRoute, newLocation, setNewLocation, newRoute, setNewRoute }: any) => {
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'routes' | 'users' | 'orders'>('overview');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<any>(null);
+  const [locationForm, setLocationForm] = useState({ name: '', address: '', image: '', googleMapsUrl: '' });
+  const [userForm, setUserForm] = useState({ 
+    name: '', 
+    email: '', 
+    password: '',
+    phone: '',
+    location: '',
+    image: '',
+    birthday: '',
+    role: 'owner' as UserRole, 
+    status: 'active' 
+  });
+
+  // Mock orders for admin (all orders)
+  const [orders, setOrders] = useState<any[]>([
+    { id: 1001, customer: 'Alice Johnson', date: '2026-03-06', status: 'pending', total: 45.50 },
+    { id: 1002, customer: 'Bob Smith', date: '2026-03-06', status: 'preparing', total: 32.00 },
+    { id: 1003, customer: 'Charlie Brown', date: '2026-03-05', status: 'delivered', total: 120.75 },
+    { id: 1004, customer: 'Diana Prince', date: '2026-03-05', status: 'onTheWay', total: 55.20 },
+  ]);
+
+  const { data: usersData = [], refetch: refetchUsers } = useUsers();
+  const users = Array.isArray(usersData) ? usersData : [];
+
+  const handleUpdateOrderStatus = (id: number, status: string) => {
+    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
+  };
+
+  const filteredUsers = users.filter((user: any) => {
+    const matchesSearch = (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (user.username || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'all' || (user.role || 'owner') === roleFilter;
+    return matchesSearch && matchesRole;
+  });
+
+  const toggleUserStatus = async (id: number) => {
+    const user = users.find((u: any) => u.id === id);
+    if (user) {
+      try {
+        await updateUser(id, { 
+          ...user,
+          isActive: !user.isActive,
+          updatedAt: new Date().toISOString()
+        });
+        refetchUsers();
+      } catch (error) {
+        console.error("Error toggling user status:", error);
+        alert("Failed to toggle user status. Check console for details.");
+      }
+    }
+  };
+
+  const handleSaveUser = async (e: FormEvent) => {
+    e.preventDefault();
+    
+    const formatDate = (dateStr: string) => {
+      if (!dateStr) return new Date().toISOString();
+      if (dateStr.includes('T')) return dateStr;
+      return `${dateStr}T00:00:00.000Z`;
+    };
+
+    try {
+      if (editingUser) {
+        await updateUser(editingUser.id, {
+          ...editingUser,
+          name: userForm.name,
+          email: userForm.email,
+          password: userForm.password || editingUser.password,
+          phoneNumber: userForm.phone,
+          address: userForm.location,
+          username: userForm.email.split('@')[0],
+          isActive: userForm.status === 'active',
+          birthDate: formatDate(userForm.birthday),
+          updatedAt: new Date().toISOString(),
+        });
+      } else {
+        await createUser({
+          id: 0,
+          name: userForm.name,
+          email: userForm.email,
+          password: userForm.password,
+          phoneNumber: userForm.phone,
+          address: userForm.location,
+          username: userForm.email.split('@')[0],
+          isActive: userForm.status === 'active',
+          birthDate: formatDate(userForm.birthday),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      refetchUsers();
+      setShowUserModal(false);
+      setEditingUser(null);
+      setUserForm({ 
+        name: '', 
+        email: '', 
+        password: '',
+        phone: '',
+        location: '',
+        image: '',
+        birthday: '',
+        role: 'owner' as UserRole, 
+        status: 'active' 
+      });
+    } catch (error: any) {
+      console.error("Error saving user:", error);
+      const errorMsg = error.response?.data?.message || error.message || "Bad Request (400)";
+      alert(`Failed to save user: ${errorMsg}`);
+    }
+  };
+
+  const handleDeleteUser = async (id: number) => {
+    if (window.confirm("Are you sure you want to delete this user?")) {
+      try {
+        await deleteUser(id);
+        refetchUsers();
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        alert("Failed to delete user.");
+      }
+    }
+  };
+
+  const openAddUser = () => {
+    setEditingUser(null);
+    setUserForm({ 
+      name: '', 
+      email: '', 
+      password: '',
+      phone: '',
+      location: '',
+      image: '',
+      birthday: '',
+      role: 'owner' as UserRole, 
+      status: 'active' 
+    });
+    setShowUserModal(true);
+  };
+
+  const openEditUser = (user: any) => {
+    setEditingUser(user);
+    setUserForm({ 
+      name: user.name || '', 
+      email: user.email || '', 
+      password: user.password || '',
+      phone: user.phoneNumber || '',
+      location: user.address || '',
+      image: user.image || '',
+      birthday: user.birthDate ? user.birthDate.split('T')[0] : '',
+      role: user.role || 'owner', 
+      status: user.isActive ? 'active' : 'inactive' 
+    });
+    setShowUserModal(true);
+  };
+
+  const openEditLocation = (loc: any) => {
+    setEditingLocation(loc);
+    setLocationForm({ 
+      name: loc.name, 
+      address: loc.address, 
+      image: loc.image || '', 
+      googleMapsUrl: loc.googleMapsUrl || '' 
+    });
+    setShowLocationModal(true);
+  };
+
+  const onUpdateLocationSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (editingLocation) {
+      await handleUpdateLocation(editingLocation.id, locationForm);
+      setShowLocationModal(false);
+      setEditingLocation(null);
+    }
+  };
+
+  return (
+    <div className="flex flex-col md:flex-row gap-8">
+      {/* Sidebar */}
+      <div className="w-full md:w-64 flex flex-col gap-2">
+        <div className="p-4 mb-4 bg-primary/10 rounded-2xl">
+          <h2 className="font-bold text-primary flex items-center gap-2">
+            <LayoutDashboard className="w-5 h-5" />
+            {t.dashboard.adminTitle}
+          </h2>
+        </div>
+        <button 
+          onClick={() => setActiveTab('overview')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'overview' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <Database className="w-4 h-4" /> {t.dashboard.overview}
+        </button>
+        <button 
+          onClick={() => setActiveTab('users')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'users' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <User className="w-4 h-4" /> {t.dashboard.users}
+        </button>
+        <button 
+          onClick={() => setActiveTab('locations')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'locations' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <MapPin className="w-4 h-4" /> {t.dashboard.locations}
+        </button>
+        <button 
+          onClick={() => setActiveTab('routes')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'routes' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <Navigation className="w-4 h-4" /> {t.dashboard.routes}
+        </button>
+        <button 
+          onClick={() => setActiveTab('orders')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1">
+        {activeTab === 'overview' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.overview}</h1>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <p className="text-zinc-500 text-sm mb-1">{t.dashboard.totalLocations}</p>
+                <p className="text-4xl font-black">{locations.length}</p>
+              </div>
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <p className="text-zinc-500 text-sm mb-1">{t.dashboard.activeHubs}</p>
+                <p className="text-4xl font-black text-emerald-500">{locations.length}</p>
+              </div>
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <p className="text-zinc-500 text-sm mb-1">{t.dashboard.systemStatus}</p>
+                <p className="text-xl font-bold text-emerald-500 flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5" /> {t.dashboard.operational}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'users' && (
+          <div className="space-y-8">
+            <div className="flex justify-between items-center">
+              <h1 className="text-3xl font-bold">{t.dashboard.users}</h1>
+              <button 
+                onClick={openAddUser}
+                className="bg-black text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:scale-[1.02] transition-transform"
+              >
+                <UserPlus className="w-5 h-5" />
+                {t.dashboard.addUser}
+              </button>
+            </div>
+            
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+              <div className="flex-1 relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                <input 
+                  type="text" 
+                  placeholder={t.dashboard.searchUsers}
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <select 
+                className="px-4 py-3 bg-white border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value as any)}
+              >
+                <option value="all">{t.dashboard.allRoles}</option>
+                <option value="admin">Admin</option>
+                <option value="owner">Restaurant</option>
+                <option value="delivery">Delivery</option>
+                <option value="pharmacy">Pharmacy</option>
+                <option value="hotel">Hotel</option>
+                <option value="family">Productive Family</option>
+              </select>
+            </div>
+
+            <div className="bg-white border border-zinc-100 rounded-3xl overflow-hidden shadow-sm">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-zinc-50 border-b border-zinc-100">
+                    <th className="px-6 py-4 font-bold text-sm">{t.dashboard.userName}</th>
+                    <th className="px-6 py-4 font-bold text-sm">{t.dashboard.userEmail}</th>
+                    <th className="px-6 py-4 font-bold text-sm">{t.dashboard.userRole}</th>
+                    <th className="px-6 py-4 font-bold text-sm">{t.dashboard.userStatus}</th>
+                    <th className="px-6 py-4 font-bold text-sm text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-50">
+                  {filteredUsers.map((user: any) => (
+                    <tr key={user.id} className="hover:bg-zinc-50/50 transition-colors">
+                      <td className="px-6 py-4 text-sm font-bold">{user.name}</td>
+                      <td className="px-6 py-4 text-sm text-zinc-500">{user.email}</td>
+                      <td className="px-6 py-4">
+                        <span className="px-3 py-1 bg-zinc-100 text-zinc-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                          {user.role || 'owner'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${user.isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                          {user.isActive ? t.dashboard.active : t.dashboard.inactive}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button 
+                            onClick={() => openEditUser(user)}
+                            className="p-2 text-zinc-400 hover:text-black transition-colors"
+                            title={t.common.edit}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => toggleUserStatus(user.id)}
+                            className={`p-2 rounded-lg transition-colors ${user.isActive ? 'text-zinc-400 hover:text-red-500' : 'text-zinc-400 hover:text-emerald-500'}`}
+                            title={user.isActive ? 'Deactivate' : 'Activate'}
+                          >
+                            {user.isActive ? <X className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filteredUsers.length === 0 && (
+                <div className="p-12 text-center">
+                  <p className="text-zinc-400 font-medium">No users found matching your criteria.</p>
+                </div>
+              )}
+            </div>
+
+            {/* User Modal */}
+            <AnimatePresence>
+              {showUserModal && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm"
+                >
+                  <motion.div 
+                    initial={{ scale: 0.9, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.9, y: 20 }}
+                    className="bg-white w-full max-w-lg rounded-3xl p-8 shadow-2xl"
+                  >
+                    <div className="flex justify-between items-center mb-8">
+                      <h2 className="text-2xl font-bold">{editingUser ? t.dashboard.editUser : t.dashboard.addUser}</h2>
+                      <button onClick={() => setShowUserModal(false)} className="p-2 hover:bg-zinc-100 rounded-full">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveUser} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-500 mb-1">{t.dashboard.userName}</label>
+                          <input 
+                            type="text" 
+                            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                            value={userForm.name}
+                            onChange={e => setUserForm({ ...userForm, name: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-500 mb-1">{t.dashboard.userEmail}</label>
+                          <input 
+                            type="email" 
+                            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                            value={userForm.email}
+                            onChange={e => setUserForm({ ...userForm, email: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-500 mb-1">{t.dashboard.userPassword}</label>
+                          <input 
+                            type="password" 
+                            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                            value={userForm.password}
+                            onChange={e => setUserForm({ ...userForm, password: e.target.value })}
+                            required={!editingUser}
+                            placeholder={editingUser ? "Leave blank to keep same" : ""}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-500 mb-1">{t.dashboard.userPhone}</label>
+                          <input 
+                            type="tel" 
+                            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                            value={userForm.phone}
+                            onChange={e => setUserForm({ ...userForm, phone: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-500 mb-1">{t.dashboard.userLocation}</label>
+                          <input 
+                            type="text" 
+                            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                            value={userForm.location}
+                            onChange={e => setUserForm({ ...userForm, location: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-500 mb-1">{t.dashboard.userBirthday}</label>
+                          <input 
+                            type="date" 
+                            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                            value={userForm.birthday}
+                            onChange={e => setUserForm({ ...userForm, birthday: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-zinc-500 mb-1">{t.dashboard.userImage}</label>
+                          <input 
+                            type="url" 
+                            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                            value={userForm.image}
+                            onChange={e => setUserForm({ ...userForm, image: e.target.value })}
+                            placeholder="https://example.com/image.jpg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-500 mb-1">{t.dashboard.userRole}</label>
+                          <select 
+                            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none font-medium"
+                            value={userForm.role}
+                            onChange={e => setUserForm({ ...userForm, role: e.target.value as UserRole })}
+                          >
+                            <option value="admin">Admin</option>
+                            <option value="owner">Restaurant</option>
+                            <option value="delivery">Delivery</option>
+                            <option value="pharmacy">Pharmacy</option>
+                            <option value="hotel">Hotel</option>
+                            <option value="family">Productive Family</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-500 mb-1">{t.dashboard.userStatus}</label>
+                          <select 
+                            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none font-medium"
+                            value={userForm.status}
+                            onChange={e => setUserForm({ ...userForm, status: e.target.value })}
+                          >
+                            <option value="active">{t.dashboard.active}</option>
+                            <option value="inactive">{t.dashboard.inactive}</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-4 pt-4">
+                        <button 
+                          type="button"
+                          onClick={() => setShowUserModal(false)}
+                          className="flex-1 px-6 py-3 bg-zinc-100 rounded-xl font-bold hover:bg-zinc-200 transition-colors"
+                        >
+                          {t.common.cancel}
+                        </button>
+                        <button 
+                          type="submit"
+                          className="flex-1 px-6 py-3 bg-black text-white rounded-xl font-bold hover:bg-zinc-800 transition-colors"
+                        >
+                          {t.dashboard.saveUser}
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {activeTab === 'locations' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.locations}</h1>
+            <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+              <h3 className="font-bold mb-4">{t.dashboard.addNewHub}</h3>
+              <form onSubmit={handleCreateLocation} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input 
+                  type="text" placeholder="Location Name" 
+                  className="px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100 text-sm"
+                  value={newLocation.name} onChange={e => setNewLocation({...newLocation, name: e.target.value})}
+                  required
+                />
+                <input 
+                  type="text" placeholder="Full Address" 
+                  className="px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100 text-sm"
+                  value={newLocation.address} onChange={e => setNewLocation({...newLocation, address: e.target.value})}
+                  required
+                />
+                <button type="submit" className="md:col-span-2 bg-black text-white py-3 rounded-xl font-bold hover:bg-zinc-800 transition-colors">
+                  {t.dashboard.addNewHub}
+                </button>
+              </form>
+            </div>
+            <div className="bg-white border border-zinc-100 rounded-3xl overflow-hidden shadow-sm">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-zinc-50 border-b border-zinc-100">
+                    <th className="px-6 py-4 font-bold text-sm">Name</th>
+                    <th className="px-6 py-4 font-bold text-sm">Address</th>
+                    <th className="px-6 py-4 font-bold text-sm text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-50">
+                  {locations.map((loc: any) => (
+                    <tr key={loc.id} className="hover:bg-zinc-50/50 transition-colors">
+                      <td className="px-6 py-4 text-sm font-medium">{loc.name}</td>
+                      <td className="px-6 py-4 text-sm text-zinc-500 truncate max-w-xs">{loc.address}</td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => openEditLocation(loc)} className="p-2 text-zinc-400 hover:text-black transition-colors">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDeleteLocation(loc.id)} className="p-2 text-zinc-400 hover:text-red-500 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Location Edit Modal */}
+            <AnimatePresence>
+              {showLocationModal && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm"
+                >
+                  <motion.div 
+                    initial={{ scale: 0.9, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.9, y: 20 }}
+                    className="bg-white w-full max-w-lg rounded-3xl p-8 shadow-2xl"
+                  >
+                    <div className="flex justify-between items-center mb-8">
+                      <h2 className="text-2xl font-bold">Edit Location</h2>
+                      <button onClick={() => setShowLocationModal(false)} className="p-2 hover:bg-zinc-100 rounded-full">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={onUpdateLocationSubmit} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-500 mb-1">Location Name</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                          value={locationForm.name}
+                          onChange={e => setLocationForm({ ...locationForm, name: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-500 mb-1">Full Address</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                          value={locationForm.address}
+                          onChange={e => setLocationForm({ ...locationForm, address: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-500 mb-1">Image URL</label>
+                        <input 
+                          type="url" 
+                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                          value={locationForm.image}
+                          onChange={e => setLocationForm({ ...locationForm, image: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-500 mb-1">Google Maps URL</label>
+                        <input 
+                          type="url" 
+                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                          value={locationForm.googleMapsUrl}
+                          onChange={e => setLocationForm({ ...locationForm, googleMapsUrl: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="flex gap-4 pt-4">
+                        <button 
+                          type="button"
+                          onClick={() => setShowLocationModal(false)}
+                          className="flex-1 px-6 py-3 bg-zinc-100 rounded-xl font-bold hover:bg-zinc-200 transition-colors"
+                        >
+                          {t.common.cancel}
+                        </button>
+                        <button 
+                          type="submit"
+                          className="flex-1 px-6 py-3 bg-black text-white rounded-xl font-bold hover:bg-zinc-800 transition-colors"
+                        >
+                          {t.common.save}
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {activeTab === 'routes' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.routes}</h1>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-4">1. Select Origin Hub</h3>
+                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                  {locations.map((loc: any) => (
+                    <button 
+                      key={loc.id}
+                      onClick={() => setSelectedOriginId(loc.id)}
+                      className={`w-full text-left px-4 py-2 rounded-lg text-sm transition-all ${selectedOriginId === loc.id ? 'bg-primary text-white font-bold' : 'bg-zinc-50 hover:bg-zinc-100'}`}
+                    >
+                      {loc.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className={`p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm transition-opacity ${!selectedOriginId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+                <h3 className="font-bold mb-4">2. Add Route</h3>
+                <form onSubmit={handleCreateRoute} className="space-y-4">
+                  <input 
+                    type="text" placeholder="Destination Name" 
+                    className="w-full px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100 text-sm"
+                    value={newRoute.destination} onChange={e => setNewRoute({...newRoute, destination: e.target.value})}
+                    required
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <input 
+                      type="text" placeholder="Distance" 
+                      className="px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100 text-sm"
+                      value={newRoute.distance} onChange={e => setNewRoute({...newRoute, distance: e.target.value})}
+                      required
+                    />
+                    <input 
+                      type="number" step="0.01" placeholder="Price" 
+                      className="px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100 text-sm"
+                      value={newRoute.price} onChange={e => setNewRoute({...newRoute, price: parseFloat(e.target.value)})}
+                      required
+                    />
+                  </div>
+                  <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-bold hover:bg-zinc-800 transition-colors">
+                    Add Route
+                  </button>
+                </form>
+              </div>
+            </div>
+            {selectedOriginId && (
+              <div className="bg-white border border-zinc-100 rounded-3xl overflow-hidden shadow-sm">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-zinc-100">
+                      <th className="px-6 py-4 font-bold text-sm">Destination</th>
+                      <th className="px-6 py-4 font-bold text-sm">Distance</th>
+                      <th className="px-6 py-4 font-bold text-sm">Price</th>
+                      <th className="px-6 py-4 font-bold text-sm text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-50">
+                    {routes.map((route: any) => (
+                      <tr key={route.id} className="hover:bg-zinc-50/50 transition-colors">
+                        <td className="px-6 py-4 text-sm font-medium">{route.destination}</td>
+                        <td className="px-6 py-4 text-sm text-zinc-500">{route.distance}</td>
+                        <td className="px-6 py-4 text-sm font-bold">${route.price.toFixed(2)}</td>
+                        <td className="px-6 py-4 text-right">
+                          <button onClick={() => handleDeleteRoute(route.id)} className="p-2 text-zinc-400 hover:text-red-500 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'orders' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
+            <OrderManagement role="admin" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const RestaurantOwnerDashboard = () => {
+  const { t, language } = useLanguage();
+  const [activeTab, setActiveTab] = useState<'profile' | 'messages' | 'images' | 'location' | 'orders' | 'meals' | 'categories'>('profile');
+  const [categories, setCategories] = useState<any[]>([
+    { id: 1, name: 'Juices' },
+    { id: 2, name: 'Meat' },
+    { id: 3, name: 'Chicken' }
+  ]);
+  const [meals, setMeals] = useState<any[]>([
+    {
+      id: 1,
+      name: 'Classic Cheeseburger',
+      price: 12.99,
+      description: 'Juicy beef patty with cheddar cheese, lettuce, and tomato.',
+      isAvailable: true,
+      baseImage: 'https://picsum.photos/seed/burger1/400',
+      gallery: ['https://picsum.photos/seed/burger2/400', 'https://picsum.photos/seed/burger3/400'],
+      quantity: 50,
+      sizes: ['Small', 'Medium', 'Large'],
+      categories: [2] // Meat
+    }
+  ]);
+
+  const [orders, setOrders] = useState<any[]>([
+    { id: 2001, customer: 'John Doe', date: '2026-03-06', status: 'preparing', total: 45.00 },
+    { id: 2002, customer: 'Jane Smith', date: '2026-03-06', status: 'pending', total: 28.50 },
+  ]);
+
+  const handleUpdateOrderStatus = (id: number, status: string) => {
+    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
+  };
+
+  const [isAddingMeal, setIsAddingMeal] = useState(false);
+  const [editingMeal, setEditingMeal] = useState<any>(null);
+
+  const handleSaveMeal = (e: FormEvent) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
+    const mealData = {
+      id: editingMeal ? editingMeal.id : Date.now(),
+      name: formData.get('name'),
+      price: parseFloat(formData.get('price') as string),
+      description: formData.get('description'),
+      isAvailable: formData.get('isAvailable') === 'on',
+      baseImage: formData.get('baseImage'),
+      quantity: parseInt(formData.get('quantity') as string),
+      sizes: (formData.get('sizes') as string).split(',').map(s => s.trim()),
+      gallery: (formData.get('gallery') as string).split(',').map(s => s.trim()).filter(s => s !== ''),
+      categories: Array.from(formData.getAll('categories')).map(id => parseInt(id as string))
+    };
+
+    if (editingMeal) {
+      setMeals(meals.map(m => m.id === editingMeal.id ? mealData : m));
+    } else {
+      setMeals([...meals, mealData]);
+    }
+    setIsAddingMeal(false);
+    setEditingMeal(null);
+  };
+
+  return (
+    <div className="flex flex-col md:flex-row gap-8">
+      {/* Sidebar */}
+      <div className="w-full md:w-64 flex flex-col gap-2">
+        <div className="p-4 mb-4 bg-primary/10 rounded-2xl">
+          <h2 className="font-bold text-primary flex items-center gap-2">
+            <LayoutDashboard className="w-5 h-5" />
+            {t.dashboard.ownerTitle}
+          </h2>
+        </div>
+        <button 
+          onClick={() => setActiveTab('profile')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'profile' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <User className="w-4 h-4" /> {t.dashboard.profile}
+        </button>
+        <button 
+          onClick={() => setActiveTab('meals')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'meals' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <ClipboardList className="w-4 h-4" /> {t.dashboard.meals}
+        </button>
+        <button 
+          onClick={() => setActiveTab('categories')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'categories' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <Database className="w-4 h-4" /> {t.dashboard.manageCategories}
+        </button>
+        <button 
+          onClick={() => setActiveTab('messages')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'messages' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <Mail className="w-4 h-4" /> {t.dashboard.messages}
+        </button>
+        <button 
+          onClick={() => setActiveTab('images')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'images' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <ImageIcon className="w-4 h-4" /> {t.dashboard.images}
+        </button>
+        <button 
+          onClick={() => setActiveTab('location')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'location' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <MapPin className="w-4 h-4" /> {t.dashboard.locations}
+        </button>
+        <button 
+          onClick={() => setActiveTab('orders')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1">
+        {activeTab === 'profile' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.profile}</h1>
+            <div className="p-8 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+              <div className="flex items-center gap-6 mb-8">
+                <div className="w-24 h-24 bg-zinc-100 rounded-2xl flex items-center justify-center overflow-hidden">
+                  <img src="https://picsum.photos/seed/restaurant/200" alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">The Burger Joint</h2>
+                  <p className="text-zinc-500">Premium Burgers & Shakes</p>
+                </div>
+              </div>
+              <form className="space-y-4 max-w-xl">
+                <div>
+                  <label className="block text-sm font-bold mb-1.5">Restaurant Name</label>
+                  <input type="text" defaultValue="The Burger Joint" className="w-full px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-1.5">Description</label>
+                  <textarea rows={3} defaultValue="Serving the best burgers in town since 2010." className="w-full px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100" />
+                </div>
+                <button className="bg-black text-white px-8 py-3 rounded-xl font-bold hover:bg-zinc-800 transition-colors">
+                  {t.common.save}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'meals' && (
+          <div className="space-y-8">
+            <div className="flex justify-between items-center">
+              <h1 className="text-3xl font-bold">{t.dashboard.meals}</h1>
+              <button 
+                onClick={() => setIsAddingMeal(true)}
+                className="bg-black text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-zinc-800 transition-colors"
+              >
+                <Plus className="w-4 h-4" /> {t.dashboard.addMeal}
+              </button>
+            </div>
+
+            {isAddingMeal || editingMeal ? (
+              <div className="p-8 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h2 className="text-xl font-bold mb-6">{editingMeal ? t.dashboard.editMeal : t.dashboard.addMeal}</h2>
+                <form onSubmit={handleSaveMeal} className="space-y-6 max-w-2xl">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold mb-1.5">{t.dashboard.mealName}</label>
+                      <input name="name" type="text" defaultValue={editingMeal?.name} className="w-full px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100" required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold mb-1.5">{t.dashboard.mealPrice}</label>
+                      <input name="price" type="number" step="0.01" defaultValue={editingMeal?.price} className="w-full px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100" required />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold mb-1.5">{t.dashboard.mealDescription}</label>
+                    <textarea name="description" rows={3} defaultValue={editingMeal?.description} className="w-full px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100" required />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold mb-1.5">{t.dashboard.baseImage}</label>
+                      <input name="baseImage" type="url" defaultValue={editingMeal?.baseImage} className="w-full px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100" required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold mb-1.5">{t.dashboard.mealQuantity}</label>
+                      <input name="quantity" type="number" defaultValue={editingMeal?.quantity} className="w-full px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100" required />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold mb-1.5">{t.dashboard.mealSizes} ({language === 'ar' ? 'افصل بينها بفواصل' : 'comma separated'})</label>
+                    <input name="sizes" type="text" defaultValue={editingMeal?.sizes?.join(', ')} placeholder="Small, Medium, Large" className="w-full px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold mb-1.5">{t.dashboard.galleryImages} ({language === 'ar' ? 'افصل بينها بفواصل' : 'comma separated URLs'})</label>
+                    <textarea name="gallery" rows={2} defaultValue={editingMeal?.gallery?.join(', ')} placeholder="https://image1.com, https://image2.com" className="w-full px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold mb-1.5">{t.dashboard.selectCategories}</label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {categories.map(cat => (
+                        <label key={cat.id} className="flex items-center gap-2 p-3 bg-zinc-50 rounded-xl border border-zinc-100 cursor-pointer hover:bg-zinc-100 transition-colors">
+                          <input 
+                            type="checkbox" 
+                            name="categories" 
+                            value={cat.id} 
+                            defaultChecked={editingMeal?.categories?.includes(cat.id)}
+                            className="w-4 h-4 accent-black"
+                          />
+                          <span className="text-sm">{cat.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input name="isAvailable" type="checkbox" defaultChecked={editingMeal ? editingMeal.isAvailable : true} className="w-5 h-5 accent-black" />
+                    <label className="text-sm font-bold">{t.dashboard.mealAvailability}</label>
+                  </div>
+                  <div className="flex gap-4 pt-4">
+                    <button type="submit" className="bg-black text-white px-8 py-3 rounded-xl font-bold hover:bg-zinc-800 transition-colors">
+                      {t.common.save}
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => { setIsAddingMeal(false); setEditingMeal(null); }}
+                      className="bg-zinc-100 text-zinc-600 px-8 py-3 rounded-xl font-bold hover:bg-zinc-200 transition-colors"
+                    >
+                      {t.common.cancel}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {meals.map(meal => (
+                  <div key={meal.id} className="bg-white border border-zinc-100 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                    <div className="aspect-video relative">
+                      <img src={meal.baseImage} alt={meal.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div className="absolute top-4 right-4">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${meal.isAvailable ? 'bg-emerald-500 text-white' : 'bg-zinc-500 text-white'}`}>
+                          {meal.isAvailable ? t.dashboard.operational : 'Unavailable'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-bold text-lg">{meal.name}</h3>
+                        <span className="font-black text-primary">${meal.price.toFixed(2)}</span>
+                      </div>
+                      <p className="text-zinc-500 text-sm mb-4 line-clamp-2">{meal.description}</p>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {meal.categories?.map((catId: number) => {
+                          const cat = categories.find(c => c.id === catId);
+                          return cat ? (
+                            <span key={catId} className="px-2 py-0.5 bg-primary/10 text-primary rounded-lg text-[10px] font-bold">
+                              {cat.name}
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {meal.sizes.map((s: string) => (
+                          <span key={s} className="px-2 py-1 bg-zinc-100 rounded-lg text-[10px] font-bold text-zinc-600">{s}</span>
+                        ))}
+                      </div>
+                      <div className="flex justify-between items-center pt-4 border-t border-zinc-50">
+                        <span className="text-xs text-zinc-400">{t.dashboard.mealQuantity}: {meal.quantity}</span>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setEditingMeal(meal)}
+                            className="p-2 text-zinc-400 hover:text-black transition-colors"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => setMeals(meals.filter(m => m.id !== meal.id))}
+                            className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'categories' && (
+          <div className="space-y-8">
+            <div className="flex justify-between items-center">
+              <h1 className="text-3xl font-bold">{t.dashboard.manageCategories}</h1>
+            </div>
+            
+            <div className="p-8 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const name = formData.get('categoryName') as string;
+                  if (name) {
+                    setCategories([...categories, { id: Date.now(), name }]);
+                    e.currentTarget.reset();
+                  }
+                }}
+                className="flex gap-4 mb-8"
+              >
+                <div className="flex-1">
+                  <input 
+                    name="categoryName"
+                    type="text" 
+                    placeholder={t.dashboard.categoryName}
+                    className="w-full px-4 py-3 bg-zinc-50 rounded-xl border border-zinc-100 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    required
+                  />
+                </div>
+                <button type="submit" className="bg-black text-white px-8 py-3 rounded-xl font-bold hover:bg-zinc-800 transition-colors flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  {t.dashboard.addCategory}
+                </button>
+              </form>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {categories.map(cat => (
+                  <div key={cat.id} className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex justify-between items-center">
+                    <span className="font-bold">{cat.name}</span>
+                    <button 
+                      onClick={() => setCategories(categories.filter(c => c.id !== cat.id))}
+                      className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'messages' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.messages}</h1>
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm flex justify-between items-center">
+                  <div className="flex gap-4 items-center">
+                    <div className="w-12 h-12 bg-zinc-100 rounded-full flex items-center justify-center">
+                      <User className="w-6 h-6 text-zinc-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold">Customer #{i}</h4>
+                      <p className="text-sm text-zinc-500">Is my order on the way?</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-zinc-400">2h ago</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'images' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.images}</h1>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="aspect-square bg-zinc-100 rounded-2xl overflow-hidden relative group">
+                  <img src={`https://picsum.photos/seed/dish${i}/400`} alt="Dish" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button className="p-2 bg-white rounded-full text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button className="aspect-square border-2 border-dashed border-zinc-200 rounded-2xl flex flex-col items-center justify-center gap-2 text-zinc-400 hover:border-black hover:text-black transition-all">
+                <Plus className="w-8 h-8" />
+                <span className="text-xs font-bold">Add Image</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'location' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.locations}</h1>
+            <div className="p-8 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+              <div className="h-[300px] bg-zinc-100 rounded-2xl mb-6 flex items-center justify-center text-zinc-400">
+                <MapPin className="w-12 h-12" />
+                <span className="ml-2 font-bold">Map Preview</span>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold mb-1.5">Address</label>
+                  <input type="text" defaultValue="123 Burger St, Food City" className="w-full px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100" />
+                </div>
+                <button className="bg-black text-white px-8 py-3 rounded-xl font-bold hover:bg-zinc-800 transition-colors">
+                  Update Location
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'orders' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
+            <OrderManagement role="owner" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const DeliveryDashboard = () => {
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders'>('overview');
+  const [orders, setOrders] = useState<any[]>([
+    { id: 3001, customer: 'Mike Ross', date: '2026-03-06', status: 'onTheWay', total: 15.00 },
+    { id: 3002, customer: 'Harvey Specter', date: '2026-03-06', status: 'preparing', total: 85.00 },
+  ]);
+
+  const handleUpdateOrderStatus = (id: number, status: string) => {
+    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
+  };
+
+  return (
+    <div className="flex flex-col md:flex-row gap-8">
+      <div className="w-full md:w-64 flex flex-col gap-2">
+        <button 
+          onClick={() => setActiveTab('overview')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'overview' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <LayoutDashboard className="w-4 h-4" /> {t.dashboard.overview}
+        </button>
+        <button 
+          onClick={() => setActiveTab('orders')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
+        </button>
+      </div>
+
+      <div className="flex-1">
+        {activeTab === 'overview' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.deliveryTitle}</h1>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-2">Active Deliveries</h3>
+                <p className="text-3xl font-black text-primary">12</p>
+              </div>
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-2">Completed Today</h3>
+                <p className="text-3xl font-black text-primary">45</p>
+              </div>
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-2">Earnings Today</h3>
+                <p className="text-3xl font-black text-primary">$180.50</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'orders' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
+            <OrderManagement role="delivery" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const PharmacyDashboard = () => {
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders'>('overview');
+  const [orders, setOrders] = useState<any[]>([
+    { id: 4001, customer: 'Louis Litt', date: '2026-03-06', status: 'pending', total: 120.00 },
+    { id: 4002, customer: 'Donna Paulsen', date: '2026-03-06', status: 'preparing', total: 45.00 },
+  ]);
+
+  const handleUpdateOrderStatus = (id: number, status: string) => {
+    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
+  };
+
+  return (
+    <div className="flex flex-col md:flex-row gap-8">
+      <div className="w-full md:w-64 flex flex-col gap-2">
+        <button 
+          onClick={() => setActiveTab('overview')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'overview' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <LayoutDashboard className="w-4 h-4" /> {t.dashboard.overview}
+        </button>
+        <button 
+          onClick={() => setActiveTab('orders')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
+        </button>
+      </div>
+
+      <div className="flex-1">
+        {activeTab === 'overview' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.pharmacyTitle}</h1>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-2">Prescriptions Pending</h3>
+                <p className="text-3xl font-black text-primary">8</p>
+              </div>
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-2">Stock Alerts</h3>
+                <p className="text-3xl font-black text-red-500">3</p>
+              </div>
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-2">Today's Sales</h3>
+                <p className="text-3xl font-black text-primary">$1,240.00</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'orders' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
+            <OrderManagement role="pharmacy" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const HotelDashboard = () => {
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders'>('overview');
+  const [orders, setOrders] = useState<any[]>([
+    { id: 5001, customer: 'Rachel Zane', date: '2026-03-06', status: 'delivered', total: 250.00 },
+    { id: 5002, customer: 'Jessica Pearson', date: '2026-03-06', status: 'preparing', total: 150.00 },
+  ]);
+
+  const handleUpdateOrderStatus = (id: number, status: string) => {
+    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
+  };
+
+  return (
+    <div className="flex flex-col md:flex-row gap-8">
+      <div className="w-full md:w-64 flex flex-col gap-2">
+        <button 
+          onClick={() => setActiveTab('overview')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'overview' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <LayoutDashboard className="w-4 h-4" /> {t.dashboard.overview}
+        </button>
+        <button 
+          onClick={() => setActiveTab('orders')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
+        </button>
+      </div>
+
+      <div className="flex-1">
+        {activeTab === 'overview' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.hotelTitle}</h1>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-2">Occupied Rooms</h3>
+                <p className="text-3xl font-black text-primary">24/30</p>
+              </div>
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-2">Check-ins Today</h3>
+                <p className="text-3xl font-black text-primary">6</p>
+              </div>
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-2">Revenue Month</h3>
+                <p className="text-3xl font-black text-primary">$12,450</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'orders' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
+            <OrderManagement role="hotel" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const ProductiveFamilyDashboard = () => {
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders'>('overview');
+  const [orders, setOrders] = useState<any[]>([
+    { id: 6001, customer: 'Katrina Bennett', date: '2026-03-06', status: 'pending', total: 45.00 },
+    { id: 6002, customer: 'Alex Williams', date: '2026-03-06', status: 'delivered', total: 65.00 },
+  ]);
+
+  const handleUpdateOrderStatus = (id: number, status: string) => {
+    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
+  };
+
+  return (
+    <div className="flex flex-col md:flex-row gap-8">
+      <div className="w-full md:w-64 flex flex-col gap-2">
+        <button 
+          onClick={() => setActiveTab('overview')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'overview' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <LayoutDashboard className="w-4 h-4" /> {t.dashboard.overview}
+        </button>
+        <button 
+          onClick={() => setActiveTab('orders')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
+        </button>
+      </div>
+
+      <div className="flex-1">
+        {activeTab === 'overview' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.familyTitle}</h1>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-2">Active Products</h3>
+                <p className="text-3xl font-black text-primary">15</p>
+              </div>
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-2">New Orders</h3>
+                <p className="text-3xl font-black text-primary">4</p>
+              </div>
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <h3 className="font-bold mb-2">Total Sales</h3>
+                <p className="text-3xl font-black text-primary">$850.00</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'orders' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
+            <OrderManagement role="family" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'routes'>('overview');
+  const { t } = useLanguage();
   const navigate = useNavigate();
+  const [role, setRole] = useState<UserRole | null>(null);
   
   useEffect(() => {
     const isAuth = localStorage.getItem('jeetk_admin_auth') === 'true';
+    const savedRole = localStorage.getItem('jeetk_user_role') as UserRole;
     if (!isAuth) {
       navigate('/login');
+    } else {
+      setRole(savedRole);
     }
   }, [navigate]);
 
   const { data: locationsData = [], refetch: refetchLocations } = useLocations();
   const locations = Array.isArray(locationsData) ? locationsData : [];
 
-  // Form states
-  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
-  const [newLocation, setNewLocation] = useState<Omit<Location, 'id'>>({ name: '', address: '', image: '', googleMapsUrl: '' });
-  
   const [selectedOriginId, setSelectedOriginId] = useState<string | null>(null);
   const { data: routesData = [], refetch: refetchRoutes } = useDeliveryRoute(selectedOriginId);
   const routes = Array.isArray(routesData) ? routesData : [];
-  
+
+  const [newLocation, setNewLocation] = useState<Omit<Location, 'id'>>({ name: '', address: '', image: '', googleMapsUrl: '' });
   const [newRoute, setNewRoute] = useState<Omit<DeliveryRoute, 'id'>>({ 
     origin: '', 
     destination: '', 
@@ -1130,6 +2682,16 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
     }
   };
 
+  const handleUpdateLocation = async (id: string, location: Partial<Location>) => {
+    try {
+      await updateLocation(id, location);
+      refetchLocations();
+      alert('Location updated successfully!');
+    } catch (err) {
+      alert('Failed to update location');
+    }
+  };
+
   const handleCreateRoute = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedOriginId) return;
@@ -1156,250 +2718,63 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 min-h-screen">
-      <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar */}
-        <div className="w-full md:w-64 flex flex-col gap-2">
-          <div className="p-4 mb-4 bg-primary/10 rounded-2xl">
-            <h2 className="font-bold text-primary flex items-center gap-2">
-              <LayoutDashboard className="w-5 h-5" />
-              Admin Dashboard
-            </h2>
-          </div>
-          <button 
-            onClick={() => setActiveTab('overview')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'overview' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
-          >
-            <Database className="w-4 h-4" /> Overview
-          </button>
-          <button 
-            onClick={() => setActiveTab('locations')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'locations' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
-          >
-            <MapPin className="w-4 h-4" /> Manage Locations
-          </button>
-          <button 
-            onClick={() => setActiveTab('routes')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'routes' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
-          >
-            <Navigation className="w-4 h-4" /> Manage Routes
-          </button>
-          
-          <div className="mt-auto pt-4 border-t border-zinc-100">
-            <button 
-              onClick={() => {
-                onLogout();
-                navigate('/login');
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-all"
-            >
-              <LogOut className="w-4 h-4" /> Sign Out
-            </button>
-          </div>
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">
+            {role === 'admin' ? t.dashboard.adminTitle : 
+             role === 'owner' ? t.dashboard.ownerTitle :
+             role === 'delivery' ? t.dashboard.deliveryTitle :
+             role === 'pharmacy' ? t.dashboard.pharmacyTitle :
+             role === 'hotel' ? t.dashboard.hotelTitle :
+             role === 'family' ? t.dashboard.familyTitle :
+             'Dashboard'}
+          </h1>
+          <p className="text-zinc-500 text-sm">Welcome back to Jeetk Management</p>
         </div>
-
-        {/* Content */}
-        <div className="flex-1">
-          {activeTab === 'overview' && (
-            <div className="space-y-8">
-              <h1 className="text-3xl font-bold">System Overview</h1>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                  <p className="text-zinc-500 text-sm mb-1">Total Locations</p>
-                  <p className="text-4xl font-black">{locations.length}</p>
-                </div>
-                <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                  <p className="text-zinc-500 text-sm mb-1">Active Hubs</p>
-                  <p className="text-4xl font-black text-emerald-500">{locations.length}</p>
-                </div>
-                <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                  <p className="text-zinc-500 text-sm mb-1">System Status</p>
-                  <p className="text-xl font-bold text-emerald-500 flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5" /> Operational
-                  </p>
-                </div>
-              </div>
-              
-              <div className="p-8 bg-zinc-900 text-white rounded-3xl">
-                <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
-                <div className="flex flex-wrap gap-4">
-                  <button onClick={() => setActiveTab('locations')} className="px-6 py-3 bg-white text-black rounded-xl font-bold text-sm hover:scale-105 transition-transform">
-                    Add New Hub
-                  </button>
-                  <button onClick={() => setActiveTab('routes')} className="px-6 py-3 bg-primary text-white rounded-xl font-bold text-sm hover:scale-105 transition-transform">
-                    Update Pricing
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'locations' && (
-            <div className="space-y-8">
-              <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold">Manage Locations</h1>
-              </div>
-
-              {/* Add Location Form */}
-              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-4">Add New Location</h3>
-                <form onSubmit={handleCreateLocation} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input 
-                    type="text" placeholder="Location Name (e.g. Berlin Mitte)" 
-                    className="px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100 text-sm"
-                    value={newLocation.name} onChange={e => setNewLocation({...newLocation, name: e.target.value})}
-                    required
-                  />
-                  <input 
-                    type="text" placeholder="Full Address" 
-                    className="px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100 text-sm"
-                    value={newLocation.address} onChange={e => setNewLocation({...newLocation, address: e.target.value})}
-                    required
-                  />
-                  <input 
-                    type="url" placeholder="Image URL (optional)" 
-                    className="px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100 text-sm"
-                    value={newLocation.image} onChange={e => setNewLocation({...newLocation, image: e.target.value})}
-                  />
-                  <input 
-                    type="url" placeholder="Google Maps URL (optional)" 
-                    className="px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100 text-sm"
-                    value={newLocation.googleMapsUrl} onChange={e => setNewLocation({...newLocation, googleMapsUrl: e.target.value})}
-                  />
-                  <button type="submit" className="md:col-span-2 bg-black text-white py-3 rounded-xl font-bold hover:bg-zinc-800 transition-colors">
-                    Create Location
-                  </button>
-                </form>
-              </div>
-
-              {/* Locations List */}
-              <div className="bg-white border border-zinc-100 rounded-3xl overflow-hidden shadow-sm">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-zinc-50 border-b border-zinc-100">
-                      <th className="px-6 py-4 font-bold text-sm">Name</th>
-                      <th className="px-6 py-4 font-bold text-sm">Address</th>
-                      <th className="px-6 py-4 font-bold text-sm text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-50">
-                    {locations.map(loc => (
-                      <tr key={loc.id} className="hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-6 py-4 text-sm font-medium">{loc.name}</td>
-                        <td className="px-6 py-4 text-sm text-zinc-500 truncate max-w-xs">{loc.address}</td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2">
-                            <button className="p-2 text-zinc-400 hover:text-black transition-colors">
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => handleDeleteLocation(loc.id)} className="p-2 text-zinc-400 hover:text-red-500 transition-colors">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'routes' && (
-            <div className="space-y-8">
-              <h1 className="text-3xl font-bold">Manage Delivery Routes</h1>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Select Origin to Manage */}
-                <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                  <h3 className="font-bold mb-4">1. Select Origin Hub</h3>
-                  <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
-                    {locations.map(loc => (
-                      <button 
-                        key={loc.id}
-                        onClick={() => setSelectedOriginId(loc.id)}
-                        className={`w-full text-left px-4 py-2 rounded-lg text-sm transition-all ${selectedOriginId === loc.id ? 'bg-primary text-white font-bold' : 'bg-zinc-50 hover:bg-zinc-100'}`}
-                      >
-                        {loc.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Add Route Form */}
-                <div className={`p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm transition-opacity ${!selectedOriginId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-                  <h3 className="font-bold mb-4">2. Add Route from {locations.find(l => l.id === selectedOriginId)?.name || '...'}</h3>
-                  <form onSubmit={handleCreateRoute} className="space-y-4">
-                    <input 
-                      type="text" placeholder="Destination Name" 
-                      className="w-full px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100 text-sm"
-                      value={newRoute.destination} onChange={e => setNewRoute({...newRoute, destination: e.target.value})}
-                      required
-                    />
-                    <div className="grid grid-cols-2 gap-4">
-                      <input 
-                        type="text" placeholder="Distance (e.g. 5 km)" 
-                        className="px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100 text-sm"
-                        value={newRoute.distance} onChange={e => setNewRoute({...newRoute, distance: e.target.value})}
-                        required
-                      />
-                      <input 
-                        type="number" step="0.01" placeholder="Price" 
-                        className="px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100 text-sm"
-                        value={newRoute.price} onChange={e => setNewRoute({...newRoute, price: parseFloat(e.target.value)})}
-                        required
-                      />
-                    </div>
-                    <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-bold hover:bg-zinc-800 transition-colors">
-                      Add Route
-                    </button>
-                  </form>
-                </div>
-              </div>
-
-              {/* Routes List */}
-              {selectedOriginId && (
-                <div className="bg-white border border-zinc-100 rounded-3xl overflow-hidden shadow-sm">
-                  <div className="px-6 py-4 border-b border-zinc-100 bg-zinc-50 flex justify-between items-center">
-                    <h3 className="font-bold">Active Routes from {locations.find(l => l.id === selectedOriginId)?.name}</h3>
-                    <span className="text-xs text-zinc-500">{routes.length} routes found</span>
-                  </div>
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-zinc-100">
-                        <th className="px-6 py-4 font-bold text-sm">Destination</th>
-                        <th className="px-6 py-4 font-bold text-sm">Distance</th>
-                        <th className="px-6 py-4 font-bold text-sm">Price</th>
-                        <th className="px-6 py-4 font-bold text-sm text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-50">
-                      {routes.map(route => (
-                        <tr key={route.id} className="hover:bg-zinc-50/50 transition-colors">
-                          <td className="px-6 py-4 text-sm font-medium">{route.destination}</td>
-                          <td className="px-6 py-4 text-sm text-zinc-500">{route.distance}</td>
-                          <td className="px-6 py-4 text-sm font-bold">${route.price.toFixed(2)}</td>
-                          <td className="px-6 py-4 text-right">
-                            <button onClick={() => handleDeleteRoute(route.id)} className="p-2 text-zinc-400 hover:text-red-500 transition-colors">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {routes.length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-8 text-center text-zinc-400 italic text-sm">
-                            No routes configured for this origin yet.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <button 
+          onClick={() => {
+            onLogout();
+            navigate('/login');
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-500 rounded-xl text-sm font-bold hover:bg-red-100 transition-colors"
+        >
+          <LogOut className="w-4 h-4" /> {t.dashboard.signOut}
+        </button>
       </div>
+
+      {role === 'admin' ? (
+        <AdminDashboard 
+          locations={locations} 
+          routes={routes} 
+          selectedOriginId={selectedOriginId} 
+          setSelectedOriginId={setSelectedOriginId}
+          handleCreateLocation={handleCreateLocation}
+          handleDeleteLocation={handleDeleteLocation}
+          handleUpdateLocation={handleUpdateLocation}
+          handleCreateRoute={handleCreateRoute}
+          handleDeleteRoute={handleDeleteRoute}
+          newLocation={newLocation}
+          setNewLocation={setNewLocation}
+          newRoute={newRoute}
+          setNewRoute={setNewRoute}
+          refetchLocations={refetchLocations}
+          refetchRoutes={refetchRoutes}
+        />
+      ) : role === 'owner' ? (
+        <RestaurantOwnerDashboard />
+      ) : role === 'delivery' ? (
+        <DeliveryDashboard />
+      ) : role === 'pharmacy' ? (
+        <PharmacyDashboard />
+      ) : role === 'hotel' ? (
+        <HotelDashboard />
+      ) : role === 'family' ? (
+        <ProductiveFamilyDashboard />
+      ) : (
+        <div className="p-8 bg-white border border-zinc-100 rounded-3xl shadow-sm text-center">
+          <h2 className="text-xl font-bold text-zinc-400">Dashboard for {role} is coming soon...</h2>
+        </div>
+      )}
     </div>
   );
 };
@@ -1425,14 +2800,23 @@ export default function App() {
     return localStorage.getItem('jeetk_admin_auth') === 'true';
   });
 
-  const handleLogin = () => {
+  const [userRole, setUserRole] = useState<UserRole | null>(() => {
+    return localStorage.getItem('jeetk_user_role') as UserRole;
+  });
+
+  const handleLogin = (role: UserRole, email: string) => {
     localStorage.setItem('jeetk_admin_auth', 'true');
+    localStorage.setItem('jeetk_user_role', role);
     setIsAuthenticated(true);
+    setUserRole(role);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('jeetk_admin_auth');
+    localStorage.removeItem('jeetk_user_role');
+    localStorage.removeItem('token');
     setIsAuthenticated(false);
+    setUserRole(null);
   };
 
   const addToCart = (item: MenuItem) => {
@@ -1470,6 +2854,7 @@ export default function App() {
           <main>
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/restaurants" element={<RestaurantsPage />} />
               <Route path="/restaurant/:id" element={<RestaurantPage addToCart={addToCart} />} />
               <Route path="/cart" element={<CartPage cart={cart} updateQuantity={updateQuantity} clearCart={clearCart} />} />
               <Route path="/tracking" element={<TrackingPage />} />
