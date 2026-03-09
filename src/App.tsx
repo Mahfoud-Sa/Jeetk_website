@@ -54,7 +54,7 @@ import {
   updateUser,
   deleteUser
 } from './services/userService';
-import { login, setToken } from './services/authService';
+import { login, setToken, assignRole } from './services/authService';
 import { GoogleGenAI } from "@google/genai";
 
 interface LanguageContextType {
@@ -1072,7 +1072,7 @@ const DeliveryRoutesPage = () => {
 };
 
 
-export type UserRole = 'admin' | 'owner' | 'delivery' | 'pharmacy' | 'hotel' | 'family';
+export type UserRole = 'admin' | 'customer' | 'delivery';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -1097,18 +1097,27 @@ const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string) => vo
       const response = await login({ email, password });
       
       // If the API returns a token, store it
-      if (response && (response as any).token) {
-        setToken((response as any).token);
+      if (response && response.token) {
+        setToken(response.token);
       }
       
-      // For now, we'll still use the mock role logic based on email 
-      // until the API returns user roles
-      if (email === 'binsabbah2013@gmail.com') {
-        onLogin('admin', email);
-      } else {
-        onLogin('owner', email);
+      // Check if user has roles
+      if (!response.roles || response.roles.length === 0) {
+        setError(language === 'ar' 
+          ? 'لا توجد أدوار لهذا المستخدم، يرجى التواصل مع المسؤول لمنحك الصلاحيات.' 
+          : 'There are no roles with this user, contact admin to give you.');
+        return;
       }
       
+      // Map API role to app role (using the first role assigned)
+      const rawRole = response.roles[0];
+      const apiRole = (typeof rawRole === 'string' ? rawRole : (rawRole as any)?.name || (rawRole as any)?.role || '').toLowerCase();
+      const validRoles: UserRole[] = ['admin', 'customer', 'delivery'];
+      
+      // Default to 'customer' if the role from API doesn't match our predefined types
+      const finalRole = validRoles.includes(apiRole as UserRole) ? (apiRole as UserRole) : 'customer';
+      
+      onLogin(finalRole, email);
       navigate('/dashboard');
     } catch (err: any) {
       console.error("Login error:", err);
@@ -1265,7 +1274,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
     location: '',
     image: '',
     birthday: '',
-    role: 'owner' as UserRole, 
+    role: 'customer' as UserRole, 
     status: 'active' 
   });
 
@@ -1288,7 +1297,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
     const matchesSearch = (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (user.username || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'all' || (user.role || 'owner') === roleFilter;
+    const matchesRole = roleFilter === 'all' || (user.role || 'customer') === roleFilter;
     return matchesSearch && matchesRole;
   });
 
@@ -1332,8 +1341,16 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
           birthDate: formatDate(userForm.birthday),
           updatedAt: new Date().toISOString(),
         });
+        
+        // Also update role if changed
+        const roleMapping: Record<string, number> = {
+          admin: 1,
+          customer: 2,
+          delivery: 3
+        };
+        await assignRole(editingUser.id, roleMapping[userForm.role] || 2);
       } else {
-        await createUser({
+        const newUser = await createUser({
           id: 0,
           name: userForm.name,
           email: userForm.email,
@@ -1346,6 +1363,17 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
+
+        // Assign role to the new user
+        const roleMapping: Record<string, number> = {
+          admin: 1,
+          customer: 2,
+          delivery: 3
+        };
+        
+        if (newUser && newUser.id) {
+          await assignRole(newUser.id, roleMapping[userForm.role] || 2);
+        }
       }
       refetchUsers();
       setShowUserModal(false);
@@ -1358,7 +1386,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
         location: '',
         image: '',
         birthday: '',
-        role: 'owner' as UserRole, 
+        role: 'customer' as UserRole, 
         status: 'active' 
       });
     } catch (error: any) {
@@ -1390,7 +1418,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
       location: '',
       image: '',
       birthday: '',
-      role: 'owner' as UserRole, 
+      role: 'customer' as UserRole, 
       status: 'active' 
     });
     setShowUserModal(true);
@@ -1406,7 +1434,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
       location: user.address || '',
       image: user.image || '',
       birthday: user.birthDate ? user.birthDate.split('T')[0] : '',
-      role: user.role || 'owner', 
+      role: user.role || 'customer', 
       status: user.isActive ? 'active' : 'inactive' 
     });
     setShowUserModal(true);
@@ -1529,11 +1557,8 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
               >
                 <option value="all">{t.dashboard.allRoles}</option>
                 <option value="admin">Admin</option>
-                <option value="owner">Restaurant</option>
+                <option value="customer">Customer</option>
                 <option value="delivery">Delivery</option>
-                <option value="pharmacy">Pharmacy</option>
-                <option value="hotel">Hotel</option>
-                <option value="family">Productive Family</option>
               </select>
             </div>
 
@@ -1555,7 +1580,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                       <td className="px-6 py-4 text-sm text-zinc-500">{user.email}</td>
                       <td className="px-6 py-4">
                         <span className="px-3 py-1 bg-zinc-100 text-zinc-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                          {user.role || 'owner'}
+                          {user.role || 'customer'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -1701,11 +1726,8 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                             onChange={e => setUserForm({ ...userForm, role: e.target.value as UserRole })}
                           >
                             <option value="admin">Admin</option>
-                            <option value="owner">Restaurant</option>
+                            <option value="customer">Customer</option>
                             <option value="delivery">Delivery</option>
-                            <option value="pharmacy">Pharmacy</option>
-                            <option value="hotel">Hotel</option>
-                            <option value="family">Productive Family</option>
                           </select>
                         </div>
                         <div>
@@ -2377,7 +2399,7 @@ const RestaurantOwnerDashboard = () => {
         {activeTab === 'orders' && (
           <div className="space-y-8">
             <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
-            <OrderManagement role="owner" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
+            <OrderManagement role="customer" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
           </div>
         )}
       </div>
@@ -2439,189 +2461,6 @@ const DeliveryDashboard = () => {
           <div className="space-y-8">
             <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
             <OrderManagement role="delivery" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const PharmacyDashboard = () => {
-  const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders'>('overview');
-  const [orders, setOrders] = useState<any[]>([
-    { id: 4001, customer: 'Louis Litt', date: '2026-03-06', status: 'pending', total: 120.00 },
-    { id: 4002, customer: 'Donna Paulsen', date: '2026-03-06', status: 'preparing', total: 45.00 },
-  ]);
-
-  const handleUpdateOrderStatus = (id: number, status: string) => {
-    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
-  };
-
-  return (
-    <div className="flex flex-col md:flex-row gap-8">
-      <div className="w-full md:w-64 flex flex-col gap-2">
-        <button 
-          onClick={() => setActiveTab('overview')}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'overview' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
-        >
-          <LayoutDashboard className="w-4 h-4" /> {t.dashboard.overview}
-        </button>
-        <button 
-          onClick={() => setActiveTab('orders')}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
-        >
-          <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
-        </button>
-      </div>
-
-      <div className="flex-1">
-        {activeTab === 'overview' && (
-          <div className="space-y-8">
-            <h1 className="text-3xl font-bold">{t.dashboard.pharmacyTitle}</h1>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-2">Prescriptions Pending</h3>
-                <p className="text-3xl font-black text-primary">8</p>
-              </div>
-              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-2">Stock Alerts</h3>
-                <p className="text-3xl font-black text-red-500">3</p>
-              </div>
-              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-2">Today's Sales</h3>
-                <p className="text-3xl font-black text-primary">$1,240.00</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'orders' && (
-          <div className="space-y-8">
-            <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
-            <OrderManagement role="pharmacy" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const HotelDashboard = () => {
-  const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders'>('overview');
-  const [orders, setOrders] = useState<any[]>([
-    { id: 5001, customer: 'Rachel Zane', date: '2026-03-06', status: 'delivered', total: 250.00 },
-    { id: 5002, customer: 'Jessica Pearson', date: '2026-03-06', status: 'preparing', total: 150.00 },
-  ]);
-
-  const handleUpdateOrderStatus = (id: number, status: string) => {
-    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
-  };
-
-  return (
-    <div className="flex flex-col md:flex-row gap-8">
-      <div className="w-full md:w-64 flex flex-col gap-2">
-        <button 
-          onClick={() => setActiveTab('overview')}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'overview' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
-        >
-          <LayoutDashboard className="w-4 h-4" /> {t.dashboard.overview}
-        </button>
-        <button 
-          onClick={() => setActiveTab('orders')}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
-        >
-          <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
-        </button>
-      </div>
-
-      <div className="flex-1">
-        {activeTab === 'overview' && (
-          <div className="space-y-8">
-            <h1 className="text-3xl font-bold">{t.dashboard.hotelTitle}</h1>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-2">Occupied Rooms</h3>
-                <p className="text-3xl font-black text-primary">24/30</p>
-              </div>
-              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-2">Check-ins Today</h3>
-                <p className="text-3xl font-black text-primary">6</p>
-              </div>
-              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-2">Revenue Month</h3>
-                <p className="text-3xl font-black text-primary">$12,450</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'orders' && (
-          <div className="space-y-8">
-            <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
-            <OrderManagement role="hotel" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const ProductiveFamilyDashboard = () => {
-  const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders'>('overview');
-  const [orders, setOrders] = useState<any[]>([
-    { id: 6001, customer: 'Katrina Bennett', date: '2026-03-06', status: 'pending', total: 45.00 },
-    { id: 6002, customer: 'Alex Williams', date: '2026-03-06', status: 'delivered', total: 65.00 },
-  ]);
-
-  const handleUpdateOrderStatus = (id: number, status: string) => {
-    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
-  };
-
-  return (
-    <div className="flex flex-col md:flex-row gap-8">
-      <div className="w-full md:w-64 flex flex-col gap-2">
-        <button 
-          onClick={() => setActiveTab('overview')}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'overview' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
-        >
-          <LayoutDashboard className="w-4 h-4" /> {t.dashboard.overview}
-        </button>
-        <button 
-          onClick={() => setActiveTab('orders')}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
-        >
-          <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
-        </button>
-      </div>
-
-      <div className="flex-1">
-        {activeTab === 'overview' && (
-          <div className="space-y-8">
-            <h1 className="text-3xl font-bold">{t.dashboard.familyTitle}</h1>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-2">Active Products</h3>
-                <p className="text-3xl font-black text-primary">15</p>
-              </div>
-              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-2">New Orders</h3>
-                <p className="text-3xl font-black text-primary">4</p>
-              </div>
-              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-2">Total Sales</h3>
-                <p className="text-3xl font-black text-primary">$850.00</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'orders' && (
-          <div className="space-y-8">
-            <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
-            <OrderManagement role="family" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
           </div>
         )}
       </div>
@@ -2722,11 +2561,8 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
         <div>
           <h1 className="text-2xl font-bold">
             {role === 'admin' ? t.dashboard.adminTitle : 
-             role === 'owner' ? t.dashboard.ownerTitle :
+             role === 'customer' ? t.dashboard.ownerTitle :
              role === 'delivery' ? t.dashboard.deliveryTitle :
-             role === 'pharmacy' ? t.dashboard.pharmacyTitle :
-             role === 'hotel' ? t.dashboard.hotelTitle :
-             role === 'family' ? t.dashboard.familyTitle :
              'Dashboard'}
           </h1>
           <p className="text-zinc-500 text-sm">Welcome back to Jeetk Management</p>
@@ -2760,16 +2596,10 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
           refetchLocations={refetchLocations}
           refetchRoutes={refetchRoutes}
         />
-      ) : role === 'owner' ? (
+      ) : role === 'customer' ? (
         <RestaurantOwnerDashboard />
       ) : role === 'delivery' ? (
         <DeliveryDashboard />
-      ) : role === 'pharmacy' ? (
-        <PharmacyDashboard />
-      ) : role === 'hotel' ? (
-        <HotelDashboard />
-      ) : role === 'family' ? (
-        <ProductiveFamilyDashboard />
       ) : (
         <div className="p-8 bg-white border border-zinc-100 rounded-3xl shadow-sm text-center">
           <h2 className="text-xl font-bold text-zinc-400">Dashboard for {role} is coming soon...</h2>

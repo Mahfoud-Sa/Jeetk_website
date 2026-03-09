@@ -6,14 +6,14 @@ export const fetchDeliveryRoute = async (
   routeId: string | null,
 ): Promise<DeliveryRoute> => {
   return (await apiClient.get(
-    `/DeliveryRoutes/${routeId}`,
+    `DeliveryRoutes/${routeId}`,
   )) as unknown as Promise<DeliveryRoute>;
 };
 
 export const fetchDeliveryRoutesByOrigin = async (
   originId: string | null,
 ): Promise<DeliveryRoute[]> => {
-  const response = await apiClient.get(`/DeliveryRoutes/origin/${originId}`);
+  const response = await apiClient.get(`DeliveryRoutes/origin/${originId}`);
   if (Array.isArray(response)) return response;
   if (response && typeof response === 'object' && Array.isArray((response as any).data)) return (response as any).data;
   return [];
@@ -29,15 +29,15 @@ export function useDeliveryRoute(originId: string | null) {
 }
 
 export const createDeliveryRoute = async (route: Omit<DeliveryRoute, 'id'>): Promise<DeliveryRoute> => {
-  return apiClient.post(`/DeliveryRoutes`, route) as unknown as Promise<DeliveryRoute>;
+  return apiClient.post(`DeliveryRoutes`, route) as unknown as Promise<DeliveryRoute>;
 };
 
 export const updateDeliveryRoute = async (id: string, route: Partial<DeliveryRoute>): Promise<DeliveryRoute> => {
-  return apiClient.put(`/DeliveryRoutes/${id}`, route) as unknown as Promise<DeliveryRoute>;
+  return apiClient.put(`DeliveryRoutes/${id}`, route) as unknown as Promise<DeliveryRoute>;
 };
 
 export const deleteDeliveryRoute = async (id: string): Promise<void> => {
-  return apiClient.delete(`/DeliveryRoutes/${id}`) as unknown as Promise<void>;
+  return apiClient.delete(`DeliveryRoutes/${id}`) as unknown as Promise<void>;
 };
 
 // Keep old hook for backward compatibility

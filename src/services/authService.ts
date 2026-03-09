@@ -9,12 +9,20 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token?: string;
-  user?: any;
-  // Add other fields based on actual API response
+  id: number;
+  name: string;
+  email: string;
+  username: string;
+  isActive: boolean;
+  roles: (string | any)[];
 }
 
 export const login = async (credentials: LoginRequest): Promise<LoginResponse> => {
-  return apiClient.post("/Auth/login", credentials);
+  return apiClient.post("Auth/login", credentials);
+};
+
+export const assignRole = async (userId: number, roleId: number): Promise<any> => {
+  return apiClient.post("Auth/roles/assign", { userId, roleId });
 };
 
 export const logout = () => {

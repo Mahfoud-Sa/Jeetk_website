@@ -3,7 +3,7 @@ import apiClient from "./apiClient";
 import { User } from "../types";
 
 export const fetchUsers = async (pageNumber = 1, pageSize = 10): Promise<User[]> => {
-  const response = await apiClient.get(`/Users`, {
+  const response = await apiClient.get(`Users`, {
     params: { pageNumber, pageSize }
   });
   if (Array.isArray(response)) return response;
@@ -13,7 +13,7 @@ export const fetchUsers = async (pageNumber = 1, pageSize = 10): Promise<User[]>
 };
 
 export const fetchUserById = async (id: number): Promise<User> => {
-  return apiClient.get(`/Users/${id}`);
+  return apiClient.get(`Users/${id}`);
 };
 
 export function useUsers(pageNumber = 1, pageSize = 100) {
@@ -33,13 +33,13 @@ export function useUser(id: number | null) {
 }
 
 export const createUser = async (user: Partial<User>): Promise<User> => {
-  return apiClient.post(`/Users`, user);
+  return apiClient.post(`Users`, user);
 };
 
 export const updateUser = async (id: number, user: Partial<User>): Promise<User> => {
-  return apiClient.put(`/Users/${id}`, user);
+  return apiClient.put(`Users/${id}`, user);
 };
 
 export const deleteUser = async (id: number): Promise<void> => {
-  return apiClient.delete(`/Users/${id}`);
+  return apiClient.delete(`Users/${id}`);
 };
