@@ -1401,13 +1401,20 @@ const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string, id: n
         return;
       }
       
-      // Map API role to app role (using the first role assigned)
-      const rawRole = response.roles[0];
-      const apiRole = (typeof rawRole === 'string' ? rawRole : (rawRole as any)?.name || (rawRole as any)?.role || '').toLowerCase();
-      const validRoles: UserRole[] = ['admin', 'customer', 'delivery'];
+      // Map API roles to app roles
+      const userRolesStrings = response.roles.map((r: any) => 
+        (typeof r === 'string' ? r : r?.name || r?.role || '').toLowerCase()
+      );
       
-      // Default to 'customer' if the role from API doesn't match our predefined types
-      const finalRole = validRoles.includes(apiRole as UserRole) ? (apiRole as UserRole) : 'customer';
+      let finalRole: UserRole = 'customer';
+      
+      if (userRolesStrings.includes('admin')) {
+        finalRole = 'admin';
+      } else if (userRolesStrings.includes('delivery')) {
+        finalRole = 'delivery';
+      } else if (userRolesStrings.includes('customer')) {
+        finalRole = 'customer';
+      }
       
       onLogin(finalRole, email, response.id);
       navigate('/dashboard');
