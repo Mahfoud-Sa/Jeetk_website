@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "./apiClient";
-import { User } from "../types";
+import { User, CreateUserRequest } from "../types";
 
 export const fetchUsers = async (pageNumber = 1, pageSize = 10): Promise<User[]> => {
   const response = await apiClient.get(`Users`, {
@@ -32,7 +32,7 @@ export function useUser(id: number | null) {
   });
 }
 
-export const createUser = async (user: Partial<User>): Promise<User> => {
+export const createUser = async (user: CreateUserRequest | Partial<User>): Promise<User> => {
   return apiClient.post(`Users`, user);
 };
 

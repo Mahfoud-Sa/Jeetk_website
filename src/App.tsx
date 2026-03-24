@@ -1,4 +1,4 @@
-import { useState, useEffect, FC, FormEvent, createContext, useContext } from 'react';
+import { useState, useEffect, FC, FormEvent, createContext, useContext, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -29,9 +29,12 @@ import {
   Globe,
   Mail,
   Image as ImageIcon,
-  User,
+  User as UserIcon,
   ClipboardList,
-  UserPlus
+  UserPlus,
+  AlertCircle,
+  Truck,
+  Eye
 } from 'lucide-react';
 import { RESTAURANTS, MENU_ITEMS } from './constants';
 import { Restaurant, MenuItem, CartItem, Order, Location, LocationRequest, DeliveryRoute } from './types';
@@ -52,9 +55,19 @@ import {
   useUsers,
   createUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  fetchUserById
 } from './services/userService';
-import { login, setToken, assignRole } from './services/authService';
+import {
+  useOrders,
+  createOrder,
+  updateOrder,
+  deleteOrder
+} from './services/orderService';
+import { login, setToken, assignRole, registerDelivery, DeliveryRegisterRequest } from './services/authService';
+import { setGlobalErrorHandler } from './services/apiClient';
+import { ToastContainer, ToastType } from './components/Toast';
+import { UserProfile } from './components/UserProfile';
 import { GoogleGenAI } from "@google/genai";
 
 interface LanguageContextType {
@@ -65,9 +78,21 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-const useLanguage = () => {
+export const useLanguage = () => {
   const context = useContext(LanguageContext);
   if (!context) throw new Error('useLanguage must be used within a LanguageProvider');
+  return context;
+};
+
+interface ToastContextType {
+  showToast: (message: string, type?: ToastType) => void;
+}
+
+const ToastContext = createContext<ToastContextType | undefined>(undefined);
+
+export const useToast = () => {
+  const context = useContext(ToastContext);
+  if (!context) throw new Error('useToast must be used within a ToastProvider');
   return context;
 };
 
@@ -710,6 +735,7 @@ const TrackingPage = () => {
 };
 
 const LocationsPage = () => {
+  const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [expandedLocations, setExpandedLocations] = useState<Record<string, boolean>>({});
@@ -745,7 +771,7 @@ const LocationsPage = () => {
     
     setRequests([request, ...requests]);
     setNewRequest({ name: '', address: '' });
-    alert('Location request sent! It will be added once an admin approves it.');
+    showToast('Location request sent! It will be added once an admin approves it.', 'success');
   };
 
   if (isLoading) {
@@ -1080,7 +1106,273 @@ interface AuthState {
   userEmail: string | null;
 }
 
-const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string) => void }) => {
+const DeliveryRegistrationPage = () => {
+  const { t, language } = useLanguage();
+  const [formData, setFormData] = useState<DeliveryRegisterRequest>({
+    name: '',
+    birthDate: '',
+    email: '',
+    password: '',
+    phoneNumber: '',
+    address: '',
+    username: '',
+    phoneNumbers: [{ number: '', type: 'Primary' }]
+  });
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const updatePhoneNumber = (index: number, field: 'number' | 'type', value: string) => {
+    const newPhoneNumbers = [...formData.phoneNumbers];
+    newPhoneNumbers[index][field] = value;
+    setFormData({ ...formData, phoneNumbers: newPhoneNumbers });
+    
+    // Also update the main phoneNumber field if it's the first one's number
+    if (index === 0 && field === 'number') {
+      setFormData(prev => ({ ...prev, phoneNumber: value, phoneNumbers: newPhoneNumbers }));
+    }
+  };
+
+  const addPhoneNumber = () => {
+    setFormData({
+      ...formData,
+      phoneNumbers: [...formData.phoneNumbers, { number: '', type: 'Secondary' }]
+    });
+  };
+
+  const removePhoneNumber = (index: number) => {
+    if (formData.phoneNumbers.length > 1) {
+      const newPhoneNumbers = formData.phoneNumbers.filter((_, i) => i !== index);
+      setFormData({ ...formData, phoneNumbers: newPhoneNumbers });
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    
+    try {
+      // Ensure birthDate is in ISO format
+      const payload = {
+        ...formData,
+        birthDate: new Date(formData.birthDate).toISOString()
+      };
+      await registerDelivery(payload);
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/login');
+      }, 3000);
+    } catch (err: any) {
+      console.error("Registration error:", err);
+      const errorMsg = err.response?.data?.message || err.message || (language === 'ar' ? 'فشل التسجيل.' : 'Registration failed.');
+      setError(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white p-8 rounded-3xl border border-zinc-100 shadow-xl"
+        >
+          <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+          </div>
+          <h1 className="text-2xl font-bold mb-2">
+            {language === 'ar' ? 'تم التسجيل بنجاح!' : 'Registration Successful!'}
+          </h1>
+          <p className="text-zinc-500 mb-6">
+            {language === 'ar' 
+              ? 'تم إنشاء حسابك بنجاح. سيتم توجيهك إلى صفحة تسجيل الدخول...' 
+              : 'Your account has been created successfully. Redirecting to login...'}
+          </p>
+          <button 
+            onClick={() => navigate('/login')}
+            className="w-full bg-black text-white py-4 rounded-xl font-bold"
+          >
+            {t.nav.login}
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-xl mx-auto px-4 py-12">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white p-8 rounded-3xl border border-zinc-100 shadow-xl"
+      >
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <UserPlus className="w-8 h-8 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold">
+            {language === 'ar' ? 'التسجيل كمندوب توصيل' : 'Register as Delivery'}
+          </h1>
+          <p className="text-zinc-500 text-sm">
+            {language === 'ar' 
+              ? 'انضم إلى فريقنا وابدأ في كسب المال اليوم' 
+              : 'Join our team and start earning today'}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'الاسم الكامل' : 'Full Name'}</label>
+              <input 
+                type="text" 
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                placeholder={language === 'ar' ? 'محمد احمد' : 'John Doe'}
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'اسم المستخدم' : 'Username'}</label>
+              <input 
+                type="text" 
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                placeholder="username"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'البريد الإلكتروني' : 'Email'}</label>
+              <input 
+                type="email" 
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                placeholder="user@example.com"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+              />
+            </div>
+          <div className="space-y-4">
+            <label className="block text-sm font-bold ml-1">{language === 'ar' ? 'أرقام الهاتف' : 'Phone Numbers'}</label>
+            {formData.phoneNumbers.map((phone, index) => (
+              <div key={index} className="flex flex-col md:flex-row gap-2">
+                <div className="flex-[2]">
+                  <input 
+                    type="tel" 
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    placeholder={index === 0 ? "770266408" : (language === 'ar' ? 'رقم الهاتف' : 'Phone number')}
+                    value={phone.number}
+                    onChange={(e) => updatePhoneNumber(index, 'number', e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex-1">
+                  <input 
+                    type="text" 
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    placeholder={language === 'ar' ? 'النوع (مثلاً: أساسي)' : 'Type (e.g. Primary)'}
+                    value={phone.type}
+                    onChange={(e) => updatePhoneNumber(index, 'type', e.target.value)}
+                    required
+                  />
+                </div>
+                {index > 0 && (
+                  <button 
+                    type="button" 
+                    onClick={() => removePhoneNumber(index)}
+                    className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors self-end md:self-center"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button 
+              type="button" 
+              onClick={addPhoneNumber}
+              className="flex items-center gap-2 text-sm font-bold text-primary hover:underline ml-1"
+            >
+              <Plus className="w-4 h-4" />
+              {language === 'ar' ? 'إضافة رقم آخر' : 'Add another number'}
+            </button>
+          </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'تاريخ الميلاد' : 'Birth Date'}</label>
+            <input 
+              type="date" 
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              value={formData.birthDate}
+              onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'العنوان' : 'Address'}</label>
+            <input 
+              type="text" 
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              placeholder={language === 'ar' ? 'الشارع، المدينة' : 'Street, City'}
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'كلمة المرور' : 'Password'}</label>
+            <input 
+              type="password" 
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              placeholder="••••••••"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              required
+            />
+          </div>
+          
+          {error && (
+            <p className="text-red-500 text-xs font-medium bg-red-50 p-3 rounded-lg">{error}</p>
+          )}
+
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            className="w-full bg-black text-white py-4 rounded-xl font-bold hover:scale-[1.02] transition-transform flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <UserPlus className="w-5 h-5" />
+            )}
+            {language === 'ar' ? 'إنشاء حساب' : 'Create Account'}
+          </button>
+
+          <p className="text-center text-sm text-zinc-500 mt-4">
+            {language === 'ar' ? 'لديك حساب بالفعل؟' : 'Already have an account?'} {' '}
+            <Link to="/login" className="text-primary font-bold hover:underline">
+              {t.nav.login}
+            </Link>
+          </p>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
+
+const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string, id: number) => void }) => {
   const { t, language } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1117,7 +1409,7 @@ const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string) => vo
       // Default to 'customer' if the role from API doesn't match our predefined types
       const finalRole = validRoles.includes(apiRole as UserRole) ? (apiRole as UserRole) : 'customer';
       
-      onLogin(finalRole, email);
+      onLogin(finalRole, email, response.id);
       navigate('/dashboard');
     } catch (err: any) {
       console.error("Login error:", err);
@@ -1185,14 +1477,27 @@ const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string) => vo
             )}
             {t.nav.login}
           </button>
+
+          <div className="mt-6 pt-6 border-t border-zinc-100 text-center">
+            <p className="text-sm text-zinc-500 mb-2">
+              {language === 'ar' ? 'هل تريد العمل معنا؟' : 'Want to work with us?'}
+            </p>
+            <Link 
+              to="/register/delivery" 
+              className="inline-flex items-center gap-2 text-primary font-bold hover:underline"
+            >
+              <UserPlus className="w-4 h-4" />
+              {language === 'ar' ? 'سجل كمندوب توصيل' : 'Register as Delivery'}
+            </Link>
+          </div>
         </form>
       </motion.div>
     </div>
   );
 };
 
-const OrderManagement = ({ role, orders, onUpdateStatus }: { role: UserRole, orders: any[], onUpdateStatus: (id: number, status: string) => void }) => {
-  const { t } = useLanguage();
+const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete }: { role: UserRole, orders: any[], onUpdateStatus: (id: number, status: string) => void, onEdit?: (order: any) => void, onDelete?: (id: number) => void }) => {
+  const { t, language } = useLanguage();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -1211,37 +1516,63 @@ const OrderManagement = ({ role, orders, onUpdateStatus }: { role: UserRole, ord
         <thead>
           <tr className="bg-zinc-50 border-b border-zinc-100">
             <th className="px-6 py-4 font-bold text-sm">{t.dashboard.orderId}</th>
-            <th className="px-6 py-4 font-bold text-sm">{t.dashboard.customer}</th>
-            <th className="px-6 py-4 font-bold text-sm">{t.dashboard.date}</th>
+            <th className="px-6 py-4 font-bold text-sm">{language === 'ar' ? 'الوصف' : 'Description'}</th>
+            <th className="px-6 py-4 font-bold text-sm">{language === 'ar' ? 'المندوب' : 'Delivery'}</th>
             <th className="px-6 py-4 font-bold text-sm">{t.dashboard.status}</th>
-            <th className="px-6 py-4 font-bold text-sm text-right">{t.common.total}</th>
-            <th className="px-6 py-4 font-bold text-sm text-right">{t.dashboard.updateStatus}</th>
+            <th className="px-6 py-4 font-bold text-sm text-right">{language === 'ar' ? 'السعر' : 'Price'}</th>
+            <th className="px-6 py-4 font-bold text-sm text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-50">
-          {orders.map((order) => (
-            <tr key={order.id} className="hover:bg-zinc-50/50 transition-colors">
-              <td className="px-6 py-4 text-sm font-bold">#ORD-{order.id.toString().padStart(4, '0')}</td>
-              <td className="px-6 py-4 text-sm">{order.customer}</td>
-              <td className="px-6 py-4 text-sm text-zinc-500">{order.date}</td>
-              <td className="px-6 py-4">
-                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusColor(order.status)}`}>
-                  {(t.dashboard as any)[order.status] || order.status}
-                </span>
+          {orders.map((order, index) => (
+            <tr key={order.id || index} className="hover:bg-zinc-50/50 transition-colors">
+              <td className="px-6 py-4 text-sm font-bold">#ORD-{order.id?.toString().padStart(4, '0') || '0000'}</td>
+              <td className="px-6 py-4 text-sm">
+                <div className="max-w-[200px] truncate" title={order.description}>
+                  {order.description}
+                </div>
               </td>
-              <td className="px-6 py-4 text-sm font-bold text-right">${order.total.toFixed(2)}</td>
+              <td className="px-6 py-4 text-sm text-zinc-500">{order.deliveryName || '-'}</td>
+              <td className="px-6 py-4">
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusColor(order.orderState || order.status)}`}>
+                    {(t.dashboard as any)[order.orderState || order.status] || order.orderState || order.status}
+                  </span>
+                  <select 
+                    className="text-[10px] font-bold bg-zinc-50 border border-zinc-100 rounded-lg px-2 py-1 focus:outline-none"
+                    value={order.orderState || order.status || 'pending'}
+                    onChange={(e) => onUpdateStatus(order.id, e.target.value)}
+                  >
+                    <option value="pending">{t.dashboard.pending}</option>
+                    <option value="preparing">{t.dashboard.preparing}</option>
+                    <option value="onTheWay">{t.dashboard.onTheWay}</option>
+                    <option value="delivered">{t.dashboard.delivered}</option>
+                    <option value="cancelled">{t.dashboard.cancelled}</option>
+                  </select>
+                </div>
+              </td>
+              <td className="px-6 py-4 text-sm font-bold text-right">${(order.deliveryPrice || 0).toFixed(2)}</td>
               <td className="px-6 py-4 text-right">
-                <select 
-                  className="text-xs font-bold bg-zinc-50 border border-zinc-100 rounded-lg px-2 py-1 focus:outline-none"
-                  value={order.status}
-                  onChange={(e) => onUpdateStatus(order.id, e.target.value)}
-                >
-                  <option value="pending">{t.dashboard.pending}</option>
-                  <option value="preparing">{t.dashboard.preparing}</option>
-                  <option value="onTheWay">{t.dashboard.onTheWay}</option>
-                  <option value="delivered">{t.dashboard.delivered}</option>
-                  <option value="cancelled">{t.dashboard.cancelled}</option>
-                </select>
+                <div className="flex justify-end gap-2">
+                  {onEdit && (
+                    <button 
+                      onClick={() => onEdit(order)}
+                      className="p-2 text-zinc-400 hover:text-black transition-colors"
+                      title={t.common.edit}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                  )}
+                  {onDelete && (
+                    <button 
+                      onClick={() => onDelete(order.id)}
+                      className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+                      title={t.common.delete}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
@@ -1256,20 +1587,34 @@ const OrderManagement = ({ role, orders, onUpdateStatus }: { role: UserRole, ord
   );
 };
 
-const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOriginId, handleCreateLocation, handleDeleteLocation, handleUpdateLocation, handleCreateRoute, handleDeleteRoute, newLocation, setNewLocation, newRoute, setNewRoute }: any) => {
-  const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'routes' | 'users' | 'orders'>('overview');
+const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOriginId, handleCreateLocation, handleDeleteLocation, handleUpdateLocation, handleCreateRoute, handleDeleteRoute, newLocation, setNewLocation, newRoute, setNewRoute, userId }: any) => {
+  const { t, language } = useLanguage();
+  const { showToast } = useToast();
+  const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'routes' | 'users' | 'orders' | 'profile'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [showUserModal, setShowUserModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingUser, setViewingUser] = useState<any>(null);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [editingLocation, setEditingLocation] = useState<any>(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [orderForm, setOrderForm] = useState({
+    deliveryPrice: 0,
+    description: '',
+    deliveryLocationDescription: '',
+    orderState: 'pending',
+    receptionDescription: '',
+    deliveryName: ''
+  });
   const [locationForm, setLocationForm] = useState({ name: '', address: '', image: '', googleMapsUrl: '' });
   const [userForm, setUserForm] = useState({ 
     name: '', 
     email: '', 
     password: '',
+    confirmPassword: '',
     phone: '',
     location: '',
     image: '',
@@ -1278,26 +1623,90 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
     status: 'active' 
   });
 
-  // Mock orders for admin (all orders)
-  const [orders, setOrders] = useState<any[]>([
-    { id: 1001, customer: 'Alice Johnson', date: '2026-03-06', status: 'pending', total: 45.50 },
-    { id: 1002, customer: 'Bob Smith', date: '2026-03-06', status: 'preparing', total: 32.00 },
-    { id: 1003, customer: 'Charlie Brown', date: '2026-03-05', status: 'delivered', total: 120.75 },
-    { id: 1004, customer: 'Diana Prince', date: '2026-03-05', status: 'onTheWay', total: 55.20 },
-  ]);
+  const { data: ordersData = [], refetch: refetchOrders } = useOrders();
+  const orders = Array.isArray(ordersData) ? ordersData : [];
 
   const { data: usersData = [], refetch: refetchUsers } = useUsers();
   const users = Array.isArray(usersData) ? usersData : [];
 
-  const handleUpdateOrderStatus = (id: number, status: string) => {
-    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
+  const handleUpdateOrderStatus = async (id: number, status: string) => {
+    try {
+      await updateOrder(id, { orderState: status });
+      refetchOrders();
+      showToast("Order status updated!", "success");
+    } catch (error) {
+      showToast("Failed to update order status.", "error");
+    }
+  };
+
+  const handleSaveOrder = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingOrder) {
+        await updateOrder(editingOrder.id, orderForm);
+        showToast("Order updated successfully!", "success");
+      } else {
+        await createOrder(orderForm);
+        showToast("Order created successfully!", "success");
+      }
+      refetchOrders();
+      setShowOrderModal(false);
+      setEditingOrder(null);
+      setOrderForm({
+        deliveryPrice: 0,
+        description: '',
+        deliveryLocationDescription: '',
+        orderState: 'pending',
+        receptionDescription: '',
+        deliveryName: ''
+      });
+    } catch (error) {
+      showToast("Failed to save order.", "error");
+    }
+  };
+
+  const handleDeleteOrder = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this order?")) return;
+    try {
+      await deleteOrder(id);
+      refetchOrders();
+      showToast("Order deleted successfully!", "success");
+    } catch (error) {
+      showToast("Failed to delete order.", "error");
+    }
+  };
+
+  const openAddOrder = () => {
+    setEditingOrder(null);
+    setOrderForm({
+      deliveryPrice: 0,
+      description: '',
+      deliveryLocationDescription: '',
+      orderState: 'pending',
+      receptionDescription: '',
+      deliveryName: ''
+    });
+    setShowOrderModal(true);
+  };
+
+  const openEditOrder = (order: any) => {
+    setEditingOrder(order);
+    setOrderForm({
+      deliveryPrice: order.deliveryPrice || 0,
+      description: order.description || '',
+      deliveryLocationDescription: order.deliveryLocationDescription || '',
+      orderState: order.orderState || 'pending',
+      receptionDescription: order.receptionDescription || '',
+      deliveryName: order.deliveryName || ''
+    });
+    setShowOrderModal(true);
   };
 
   const filteredUsers = users.filter((user: any) => {
-    const matchesSearch = (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = (user.name || user.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (user.username || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'all' || (user.role || 'customer') === roleFilter;
+    const matchesRole = roleFilter === 'all' || (user.role || (user.roles && user.roles[0]) || 'customer') === roleFilter;
     return matchesSearch && matchesRole;
   });
 
@@ -1313,7 +1722,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
         refetchUsers();
       } catch (error) {
         console.error("Error toggling user status:", error);
-        alert("Failed to toggle user status. Check console for details.");
+        showToast("Failed to toggle user status.", "error");
       }
     }
   };
@@ -1351,29 +1760,21 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
         await assignRole(editingUser.id, roleMapping[userForm.role] || 2);
       } else {
         const newUser = await createUser({
-          id: 0,
-          name: userForm.name,
+          fullName: userForm.name,
           email: userForm.email,
           password: userForm.password,
-          phoneNumber: userForm.phone,
-          address: userForm.location,
-          username: userForm.email.split('@')[0],
-          isActive: userForm.status === 'active',
+          confirmPassword: userForm.confirmPassword,
+          role: userForm.role,
           birthDate: formatDate(userForm.birthday),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          phoneNumbers: [
+            {
+              number: userForm.phone,
+              type: 'Mobile'
+            }
+          ]
         });
 
-        // Assign role to the new user
-        const roleMapping: Record<string, number> = {
-          admin: 1,
-          customer: 2,
-          delivery: 3
-        };
-        
-        if (newUser && newUser.id) {
-          await assignRole(newUser.id, roleMapping[userForm.role] || 2);
-        }
+        // No need to call assignRole separately if the role is included in creation
       }
       refetchUsers();
       setShowUserModal(false);
@@ -1392,19 +1793,45 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
     } catch (error: any) {
       console.error("Error saving user:", error);
       const errorMsg = error.response?.data?.message || error.message || "Bad Request (400)";
-      alert(`Failed to save user: ${errorMsg}`);
+      showToast(`Failed to save user: ${errorMsg}`, "error");
     }
   };
 
-  const handleDeleteUser = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this user?")) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<number | null>(null);
+
+  const handleDeleteUser = async () => {
+    if (userToDelete) {
       try {
-        await deleteUser(id);
+        await deleteUser(userToDelete);
         refetchUsers();
+        showToast("User deleted successfully!", "success");
       } catch (error) {
         console.error("Error deleting user:", error);
-        alert("Failed to delete user.");
+        showToast("Failed to delete user.", "error");
+      } finally {
+        setShowDeleteConfirm(false);
+        setUserToDelete(null);
       }
+    }
+  };
+
+  const confirmDeleteUser = (id: number) => {
+    setUserToDelete(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const openViewUser = async (user: any) => {
+    try {
+      const userDetails = await fetchUserById(user.id);
+      setViewingUser(userDetails);
+      setShowViewModal(true);
+    } catch (error) {
+      console.error("Error fetching user details:", error);
+      // Fallback to the user object from the list if the detail fetch fails
+      setViewingUser(user);
+      setShowViewModal(true);
+      showToast("Failed to fetch full user details.", "error");
     }
   };
 
@@ -1414,6 +1841,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
       name: '', 
       email: '', 
       password: '',
+      confirmPassword: '',
       phone: '',
       location: '',
       image: '',
@@ -1427,14 +1855,15 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
   const openEditUser = (user: any) => {
     setEditingUser(user);
     setUserForm({ 
-      name: user.name || '', 
+      name: user.name || user.fullName || '', 
       email: user.email || '', 
-      password: user.password || '',
-      phone: user.phoneNumber || '',
+      password: '',
+      confirmPassword: '',
+      phone: user.phoneNumber || (user.phoneNumbers && user.phoneNumbers[0]?.number) || '',
       location: user.address || '',
       image: user.image || '',
       birthday: user.birthDate ? user.birthDate.split('T')[0] : '',
-      role: user.role || 'customer', 
+      role: user.role || (user.roles && user.roles[0]) || 'customer', 
       status: user.isActive ? 'active' : 'inactive' 
     });
     setShowUserModal(true);
@@ -1480,7 +1909,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
           onClick={() => setActiveTab('users')}
           className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'users' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
         >
-          <User className="w-4 h-4" /> {t.dashboard.users}
+          <UserIcon className="w-4 h-4" /> {t.dashboard.users}
         </button>
         <button 
           onClick={() => setActiveTab('locations')}
@@ -1499,6 +1928,12 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
           className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
         >
           <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
+        </button>
+        <button 
+          onClick={() => setActiveTab('profile')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'profile' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <UserIcon className="w-4 h-4" /> {language === 'ar' ? 'الملف الشخصي' : 'Profile'}
         </button>
       </div>
 
@@ -1530,13 +1965,25 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
           <div className="space-y-8">
             <div className="flex justify-between items-center">
               <h1 className="text-3xl font-bold">{t.dashboard.users}</h1>
-              <button 
-                onClick={openAddUser}
-                className="bg-black text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:scale-[1.02] transition-transform"
-              >
-                <UserPlus className="w-5 h-5" />
-                {t.dashboard.addUser}
-              </button>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => {
+                    openAddUser();
+                    setUserForm(prev => ({ ...prev, role: 'delivery' }));
+                  }}
+                  className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:scale-[1.02] transition-transform shadow-sm"
+                >
+                  <Truck className="w-5 h-5" />
+                  {language === 'ar' ? 'إضافة مندوب' : 'Add Delivery'}
+                </button>
+                <button 
+                  onClick={openAddUser}
+                  className="bg-black text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:scale-[1.02] transition-transform shadow-sm"
+                >
+                  <UserPlus className="w-5 h-5" />
+                  {t.dashboard.addUser}
+                </button>
+              </div>
             </div>
             
             <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -1576,11 +2023,11 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                 <tbody className="divide-y divide-zinc-50">
                   {filteredUsers.map((user: any) => (
                     <tr key={user.id} className="hover:bg-zinc-50/50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-bold">{user.name}</td>
+                      <td className="px-6 py-4 text-sm font-bold">{user.name || user.fullName}</td>
                       <td className="px-6 py-4 text-sm text-zinc-500">{user.email}</td>
                       <td className="px-6 py-4">
                         <span className="px-3 py-1 bg-zinc-100 text-zinc-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                          {user.role || 'customer'}
+                          {user.role || (user.roles && user.roles[0]) || 'customer'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -1590,6 +2037,13 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
+                          <button 
+                            onClick={() => openViewUser(user)}
+                            className="p-2 text-zinc-400 hover:text-primary transition-colors"
+                            title={language === 'ar' ? 'عرض' : 'View'}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                           <button 
                             onClick={() => openEditUser(user)}
                             className="p-2 text-zinc-400 hover:text-black transition-colors"
@@ -1605,7 +2059,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                             {user.isActive ? <X className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
                           </button>
                           <button 
-                            onClick={() => handleDeleteUser(user.id)}
+                            onClick={() => confirmDeleteUser(user.id)}
                             className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1678,6 +2132,18 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                             placeholder={editingUser ? "Leave blank to keep same" : ""}
                           />
                         </div>
+                        {!editingUser && (
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-500 mb-1">Confirm Password</label>
+                            <input 
+                              type="password" 
+                              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                              value={userForm.confirmPassword}
+                              onChange={e => setUserForm({ ...userForm, confirmPassword: e.target.value })}
+                              required
+                            />
+                          </div>
+                        )}
                         <div>
                           <label className="block text-sm font-medium text-zinc-500 mb-1">{t.dashboard.userPhone}</label>
                           <input 
@@ -1759,6 +2225,191 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                         </button>
                       </div>
                     </form>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* View User Details Modal */}
+            <AnimatePresence>
+              {showViewModal && viewingUser && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm"
+                >
+                  <motion.div 
+                    initial={{ scale: 0.9, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.9, y: 20 }}
+                    className="bg-white w-full max-w-2xl rounded-3xl p-8 shadow-2xl max-h-[90vh] overflow-y-auto"
+                  >
+                    <div className="flex justify-between items-center mb-8">
+                      <h2 className="text-2xl font-bold">{language === 'ar' ? 'تفاصيل المستخدم' : 'User Details'}</h2>
+                      <button onClick={() => setShowViewModal(false)} className="p-2 hover:bg-zinc-100 rounded-full">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-8">
+                      {/* Header Info */}
+                      <div className="flex items-center gap-6 pb-6 border-b border-zinc-100">
+                        <div className="w-24 h-24 bg-zinc-100 rounded-3xl flex items-center justify-center overflow-hidden border-4 border-white shadow-sm">
+                          {viewingUser.profilePictureUrl || viewingUser.image ? (
+                            <img src={viewingUser.profilePictureUrl || viewingUser.image} alt={viewingUser.fullName || viewingUser.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <UserIcon className="w-12 h-12 text-zinc-300" />
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-black">{viewingUser.fullName || viewingUser.name}</h3>
+                          <p className="text-zinc-500 font-medium">{viewingUser.email}</p>
+                          <div className="flex gap-2 mt-2 flex-wrap">
+                            {/* Handle roles from different potential structures */}
+                            {viewingUser.roles && Array.isArray(viewingUser.roles) && viewingUser.roles.length > 0 ? (
+                              viewingUser.roles.map((role: any, idx: number) => (
+                                <span key={idx} className="px-3 py-1 bg-black text-white rounded-full text-[10px] font-bold uppercase tracking-wider">
+                                  {typeof role === 'string' ? role : (role.name || role.roleName || JSON.stringify(role))}
+                                </span>
+                              ))
+                            ) : viewingUser.userRoles && Array.isArray(viewingUser.userRoles) && viewingUser.userRoles.length > 0 ? (
+                              viewingUser.userRoles.map((ur: any, idx: number) => (
+                                <span key={idx} className="px-3 py-1 bg-black text-white rounded-full text-[10px] font-bold uppercase tracking-wider">
+                                  {typeof ur === 'string' ? ur : (ur.role?.name || ur.name || ur.roleName || JSON.stringify(ur))}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="px-3 py-1 bg-black text-white rounded-full text-[10px] font-bold uppercase tracking-wider">
+                                {viewingUser.role || 'customer'}
+                              </span>
+                            )}
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${viewingUser.isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                              {viewingUser.isActive ? t.dashboard.active : t.dashboard.inactive}
+                            </span>
+                            {viewingUser.isDeleted && (
+                              <span className="px-3 py-1 bg-red-500 text-white rounded-full text-[10px] font-bold uppercase tracking-wider">
+                                {language === 'ar' ? 'محذوف' : 'Deleted'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Details Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{language === 'ar' ? 'تاريخ الميلاد' : 'Birth Date'}</p>
+                          <p className="font-medium">
+                            {viewingUser.birthDate && viewingUser.birthDate !== "0001-01-01T00:00:00" 
+                              ? new Date(viewingUser.birthDate).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') 
+                              : '-'}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{language === 'ar' ? 'اسم المستخدم' : 'Username'}</p>
+                          <p className="font-medium">@{viewingUser.username || viewingUser.email?.split('@')[0]}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{language === 'ar' ? 'العنوان' : 'Address'}</p>
+                          <p className="font-medium">{viewingUser.address || '-'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{language === 'ar' ? 'تاريخ الإنشاء' : 'Created At'}</p>
+                          <p className="font-medium">{viewingUser.createdAt ? new Date(viewingUser.createdAt).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US') : '-'}</p>
+                        </div>
+                        {viewingUser.deletedAt && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{language === 'ar' ? 'تاريخ الحذف' : 'Deleted At'}</p>
+                            <p className="font-medium text-red-500">{new Date(viewingUser.deletedAt).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Phone Numbers */}
+                      {viewingUser.phoneNumbers && viewingUser.phoneNumbers.length > 0 && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{language === 'ar' ? 'أرقام الهاتف' : 'Phone Numbers'}</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {viewingUser.phoneNumbers.map((phone: any, idx: number) => (
+                              <div key={idx} className="p-3 bg-zinc-50 rounded-xl border border-zinc-100 flex justify-between items-center">
+                                <span className="font-bold">{phone.number}</span>
+                                <span className="text-[10px] font-bold uppercase text-zinc-400 bg-white px-2 py-1 rounded-md border border-zinc-100">{phone.type}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Permissions */}
+                      {viewingUser.userPermissions && viewingUser.userPermissions.length > 0 && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{language === 'ar' ? 'الصلاحيات' : 'Permissions'}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {viewingUser.userPermissions.map((perm: any, idx: number) => (
+                              <span key={idx} className="px-3 py-1 bg-zinc-100 text-zinc-600 rounded-lg text-[10px] font-bold uppercase border border-zinc-200">
+                                {typeof perm === 'string' ? perm : (perm.name || perm.permissionName || JSON.stringify(perm))}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* System Info */}
+                      <div className="pt-6 border-t border-zinc-100 flex justify-between items-center text-[10px] text-zinc-400 font-bold uppercase tracking-widest">
+                        <span>ID: {viewingUser.id}</span>
+                        <span>{language === 'ar' ? 'آخر تحديث' : 'Last Updated'}: {viewingUser.updatedAt ? new Date(viewingUser.updatedAt).toLocaleDateString() : '-'}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-8">
+                      <button 
+                        onClick={() => setShowViewModal(false)}
+                        className="w-full py-4 bg-zinc-100 rounded-2xl font-bold hover:bg-zinc-200 transition-colors"
+                      >
+                        {t.common.close || 'Close'}
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Delete Confirmation Modal */}
+            <AnimatePresence>
+              {showDeleteConfirm && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm"
+                >
+                  <motion.div 
+                    initial={{ scale: 0.9, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.9, y: 20 }}
+                    className="bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl text-center"
+                  >
+                    <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Trash2 className="w-8 h-8 text-red-500" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2">Delete User?</h2>
+                    <p className="text-zinc-500 mb-8">This action cannot be undone. All data associated with this user will be permanently removed.</p>
+                    
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="flex-1 px-6 py-3 bg-zinc-100 rounded-xl font-bold hover:bg-zinc-200 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={handleDeleteUser}
+                        className="flex-1 px-6 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </motion.div>
                 </motion.div>
               )}
@@ -1984,18 +2635,151 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
 
         {activeTab === 'orders' && (
           <div className="space-y-8">
-            <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
-            <OrderManagement role="admin" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
+            <div className="flex justify-between items-center">
+              <h1 className="text-3xl font-bold">{t.dashboard.orders}</h1>
+              <button 
+                onClick={openAddOrder}
+                className="bg-black text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:scale-[1.02] transition-transform shadow-sm"
+              >
+                <ShoppingBag className="w-5 h-5" />
+                {language === 'ar' ? 'طلب جديد' : 'New Order'}
+              </button>
+            </div>
+            <OrderManagement 
+              role="admin" 
+              orders={orders} 
+              onUpdateStatus={handleUpdateOrderStatus} 
+              onEdit={openEditOrder}
+              onDelete={handleDeleteOrder}
+            />
           </div>
         )}
+
+        {activeTab === 'profile' && userId && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{language === 'ar' ? 'الملف الشخصي' : 'Profile'}</h1>
+            <UserProfile userId={userId} />
+          </div>
+        )}
+
+        {/* Order Modal */}
+        <AnimatePresence>
+          {showOrderModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="bg-white w-full max-w-lg rounded-3xl p-8 shadow-2xl"
+              >
+                <div className="flex justify-between items-center mb-8">
+                  <h2 className="text-2xl font-bold">{editingOrder ? (language === 'ar' ? 'تعديل الطلب' : 'Edit Order') : (language === 'ar' ? 'طلب جديد' : 'New Order')}</h2>
+                  <button onClick={() => setShowOrderModal(false)} className="p-2 hover:bg-zinc-100 rounded-full">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveOrder} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-500 mb-1">{language === 'ar' ? 'الوصف' : 'Description'}</label>
+                    <textarea 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none min-h-[100px]"
+                      value={orderForm.description}
+                      onChange={e => setOrderForm({ ...orderForm, description: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-500 mb-1">{language === 'ar' ? 'سعر التوصيل' : 'Delivery Price'}</label>
+                      <input 
+                        type="number" 
+                        step="0.01"
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                        value={isNaN(orderForm.deliveryPrice) ? '' : orderForm.deliveryPrice}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value);
+                          setOrderForm({ ...orderForm, deliveryPrice: isNaN(val) ? 0 : val });
+                        }}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-500 mb-1">{language === 'ar' ? 'الحالة' : 'Status'}</label>
+                      <select 
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                        value={orderForm.orderState}
+                        onChange={e => setOrderForm({ ...orderForm, orderState: e.target.value })}
+                      >
+                        <option value="pending">{t.dashboard.pending}</option>
+                        <option value="preparing">{t.dashboard.preparing}</option>
+                        <option value="onTheWay">{t.dashboard.onTheWay}</option>
+                        <option value="delivered">{t.dashboard.delivered}</option>
+                        <option value="cancelled">{t.dashboard.cancelled}</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-500 mb-1">{language === 'ar' ? 'اسم المندوب' : 'Delivery Name'}</label>
+                    <input 
+                      type="text" 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                      value={orderForm.deliveryName}
+                      onChange={e => setOrderForm({ ...orderForm, deliveryName: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-500 mb-1">{language === 'ar' ? 'وصف موقع التوصيل' : 'Delivery Location Description'}</label>
+                    <input 
+                      type="text" 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                      value={orderForm.deliveryLocationDescription}
+                      onChange={e => setOrderForm({ ...orderForm, deliveryLocationDescription: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-500 mb-1">{language === 'ar' ? 'وصف الاستلام' : 'Reception Description'}</label>
+                    <input 
+                      type="text" 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                      value={orderForm.receptionDescription}
+                      onChange={e => setOrderForm({ ...orderForm, receptionDescription: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="flex gap-4 pt-4">
+                    <button 
+                      type="button"
+                      onClick={() => setShowOrderModal(false)}
+                      className="flex-1 px-6 py-3 bg-zinc-100 rounded-xl font-bold hover:bg-zinc-200 transition-colors"
+                    >
+                      {t.common.cancel}
+                    </button>
+                    <button 
+                      type="submit"
+                      className="flex-1 px-6 py-3 bg-black text-white rounded-xl font-bold hover:bg-zinc-800 transition-colors"
+                    >
+                      {t.common.save}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
 };
 
-const RestaurantOwnerDashboard = () => {
+const RestaurantOwnerDashboard = ({ userId }: { userId: number | null }) => {
   const { t, language } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'profile' | 'messages' | 'images' | 'location' | 'orders' | 'meals' | 'categories'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'messages' | 'images' | 'location' | 'orders' | 'meals' | 'categories' | 'user_profile'>('profile');
   const [categories, setCategories] = useState<any[]>([
     { id: 1, name: 'Juices' },
     { id: 2, name: 'Meat' },
@@ -2017,8 +2801,8 @@ const RestaurantOwnerDashboard = () => {
   ]);
 
   const [orders, setOrders] = useState<any[]>([
-    { id: 2001, customer: 'John Doe', date: '2026-03-06', status: 'preparing', total: 45.00 },
-    { id: 2002, customer: 'Jane Smith', date: '2026-03-06', status: 'pending', total: 28.50 },
+    { id: 2001, description: 'Order from John Doe', deliveryName: 'Mandoob 1', orderState: 'preparing', deliveryPrice: 45.00 },
+    { id: 2002, description: 'Order from Jane Smith', deliveryName: 'Mandoob 2', orderState: 'pending', deliveryPrice: 28.50 },
   ]);
 
   const handleUpdateOrderStatus = (id: number, status: string) => {
@@ -2067,7 +2851,7 @@ const RestaurantOwnerDashboard = () => {
           onClick={() => setActiveTab('profile')}
           className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'profile' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
         >
-          <User className="w-4 h-4" /> {t.dashboard.profile}
+          <UserIcon className="w-4 h-4" /> {t.dashboard.profile}
         </button>
         <button 
           onClick={() => setActiveTab('meals')}
@@ -2104,6 +2888,12 @@ const RestaurantOwnerDashboard = () => {
           className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
         >
           <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
+        </button>
+        <button 
+          onClick={() => setActiveTab('user_profile')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'user_profile' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <UserIcon className="w-4 h-4" /> {language === 'ar' ? 'الملف الشخصي' : 'User Profile'}
         </button>
       </div>
 
@@ -2339,7 +3129,7 @@ const RestaurantOwnerDashboard = () => {
                 <div key={i} className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm flex justify-between items-center">
                   <div className="flex gap-4 items-center">
                     <div className="w-12 h-12 bg-zinc-100 rounded-full flex items-center justify-center">
-                      <User className="w-6 h-6 text-zinc-400" />
+                      <UserIcon className="w-6 h-6 text-zinc-400" />
                     </div>
                     <div>
                       <h4 className="font-bold">Customer #{i}</h4>
@@ -2402,17 +3192,24 @@ const RestaurantOwnerDashboard = () => {
             <OrderManagement role="customer" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
           </div>
         )}
+
+        {activeTab === 'user_profile' && userId && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{language === 'ar' ? 'الملف الشخصي' : 'User Profile'}</h1>
+            <UserProfile userId={userId} />
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-const DeliveryDashboard = () => {
-  const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders'>('overview');
+const DeliveryDashboard = ({ userId }: { userId: number | null }) => {
+  const { t, language } = useLanguage();
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'profile'>('overview');
   const [orders, setOrders] = useState<any[]>([
-    { id: 3001, customer: 'Mike Ross', date: '2026-03-06', status: 'onTheWay', total: 15.00 },
-    { id: 3002, customer: 'Harvey Specter', date: '2026-03-06', status: 'preparing', total: 85.00 },
+    { id: 3001, description: 'Order for Mike Ross', deliveryName: 'Self', orderState: 'onTheWay', deliveryPrice: 15.00 },
+    { id: 3002, description: 'Order for Harvey Specter', deliveryName: 'Self', orderState: 'preparing', deliveryPrice: 85.00 },
   ]);
 
   const handleUpdateOrderStatus = (id: number, status: string) => {
@@ -2433,6 +3230,12 @@ const DeliveryDashboard = () => {
           className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
         >
           <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
+        </button>
+        <button 
+          onClick={() => setActiveTab('profile')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'profile' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <UserIcon className="w-4 h-4" /> {language === 'ar' ? 'الملف الشخصي' : 'Profile'}
         </button>
       </div>
 
@@ -2463,13 +3266,21 @@ const DeliveryDashboard = () => {
             <OrderManagement role="delivery" orders={orders} onUpdateStatus={handleUpdateOrderStatus} />
           </div>
         )}
+
+        {activeTab === 'profile' && userId && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">{language === 'ar' ? 'الملف الشخصي' : 'Profile'}</h1>
+            <UserProfile userId={userId} />
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
+const Dashboard = ({ onLogout, userId }: { onLogout: () => void, userId: number | null }) => {
   const { t } = useLanguage();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [role, setRole] = useState<UserRole | null>(null);
   
@@ -2505,9 +3316,9 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
       await createLocation(newLocation);
       setNewLocation({ name: '', address: '', image: '', googleMapsUrl: '' });
       refetchLocations();
-      alert('Location created successfully!');
+      showToast('Location created successfully!', 'success');
     } catch (err) {
-      alert('Failed to create location');
+      showToast('Failed to create location', 'error');
     }
   };
 
@@ -2516,8 +3327,9 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
     try {
       await deleteLocation(id);
       refetchLocations();
+      showToast('Location deleted successfully!', 'success');
     } catch (err) {
-      alert('Failed to delete location');
+      showToast('Failed to delete location', 'error');
     }
   };
 
@@ -2525,9 +3337,9 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
     try {
       await updateLocation(id, location);
       refetchLocations();
-      alert('Location updated successfully!');
+      showToast('Location updated successfully!', 'success');
     } catch (err) {
-      alert('Failed to update location');
+      showToast('Failed to update location', 'error');
     }
   };
 
@@ -2539,9 +3351,9 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
       await createDeliveryRoute({ ...newRoute, origin: originName });
       setNewRoute({ origin: '', destination: '', distance: '', price: 0, isAvailable: true });
       refetchRoutes();
-      alert('Route created successfully!');
+      showToast('Route created successfully!', 'success');
     } catch (err) {
-      alert('Failed to create route');
+      showToast('Failed to create route', 'error');
     }
   };
 
@@ -2550,8 +3362,9 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
     try {
       await deleteDeliveryRoute(id);
       refetchRoutes();
+      showToast('Route deleted successfully!', 'success');
     } catch (err) {
-      alert('Failed to delete route');
+      showToast('Failed to delete route', 'error');
     }
   };
 
@@ -2595,11 +3408,12 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
           setNewRoute={setNewRoute}
           refetchLocations={refetchLocations}
           refetchRoutes={refetchRoutes}
+          userId={userId}
         />
       ) : role === 'customer' ? (
-        <RestaurantOwnerDashboard />
+        <RestaurantOwnerDashboard userId={userId} />
       ) : role === 'delivery' ? (
-        <DeliveryDashboard />
+        <DeliveryDashboard userId={userId} />
       ) : (
         <div className="p-8 bg-white border border-zinc-100 rounded-3xl shadow-sm text-center">
           <h2 className="text-xl font-bold text-zinc-400">Dashboard for {role} is coming soon...</h2>
@@ -2613,9 +3427,25 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
 
 export default function App() {
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [toasts, setToasts] = useState<{ id: string; message: string; type: ToastType }[]>([]);
   const [language, setLanguage] = useState<Language>(() => {
     return (localStorage.getItem('jeetk_lang') as Language) || 'en';
   });
+
+  const showToast = useCallback((message: string, type: ToastType = 'info') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts(prev => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  useEffect(() => {
+    setGlobalErrorHandler((message) => {
+      showToast(message, 'error');
+    });
+  }, [showToast]);
 
   useEffect(() => {
     localStorage.setItem('jeetk_lang', language);
@@ -2634,19 +3464,28 @@ export default function App() {
     return localStorage.getItem('jeetk_user_role') as UserRole;
   });
 
-  const handleLogin = (role: UserRole, email: string) => {
+  const [userId, setUserId] = useState<number | null>(() => {
+    const savedId = localStorage.getItem('jeetk_user_id');
+    return savedId ? parseInt(savedId) : null;
+  });
+
+  const handleLogin = (role: UserRole, email: string, id: number) => {
     localStorage.setItem('jeetk_admin_auth', 'true');
     localStorage.setItem('jeetk_user_role', role);
+    localStorage.setItem('jeetk_user_id', id?.toString() || '');
     setIsAuthenticated(true);
     setUserRole(role);
+    setUserId(id);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('jeetk_admin_auth');
     localStorage.removeItem('jeetk_user_role');
+    localStorage.removeItem('jeetk_user_id');
     localStorage.removeItem('token');
     setIsAuthenticated(false);
     setUserRole(null);
+    setUserId(null);
   };
 
   const addToCart = (item: MenuItem) => {
@@ -2672,65 +3511,69 @@ export default function App() {
   const clearCart = () => setCart([]);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
-      <Router>
-        <ScrollToTop />
-        <div className={`min-h-screen bg-white font-sans text-zinc-900 ${language === 'ar' ? 'font-arabic' : ''}`}>
-          <Navbar 
-            cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)} 
-            isAuthenticated={isAuthenticated}
-          />
-          
-          <main>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/restaurants" element={<RestaurantsPage />} />
-              <Route path="/restaurant/:id" element={<RestaurantPage addToCart={addToCart} />} />
-              <Route path="/cart" element={<CartPage cart={cart} updateQuantity={updateQuantity} clearCart={clearCart} />} />
-              <Route path="/tracking" element={<TrackingPage />} />
-              <Route path="/locations" element={<LocationsPage />} />
-              <Route path="/routes" element={<DeliveryRoutesPage />} />
-              <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
-              <Route path="/dashboard" element={<Dashboard onLogout={handleLogout} />} />
-            </Routes>
-          </main>
+    <ToastContext.Provider value={{ showToast }}>
+      <LanguageContext.Provider value={{ language, setLanguage, t }}>
+        <Router>
+          <ScrollToTop />
+          <div className={`min-h-screen bg-white font-sans text-zinc-900 ${language === 'ar' ? 'font-arabic' : ''}`}>
+            <Navbar 
+              cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)} 
+              isAuthenticated={isAuthenticated}
+            />
+            
+            <main>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/restaurants" element={<RestaurantsPage />} />
+                <Route path="/restaurant/:id" element={<RestaurantPage addToCart={addToCart} />} />
+                <Route path="/cart" element={<CartPage cart={cart} updateQuantity={updateQuantity} clearCart={clearCart} />} />
+                <Route path="/tracking" element={<TrackingPage />} />
+                <Route path="/locations" element={<LocationsPage />} />
+                <Route path="/routes" element={<DeliveryRoutesPage />} />
+                <Route path="/register/delivery" element={<DeliveryRegistrationPage />} />
+                <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+                <Route path="/dashboard" element={<Dashboard onLogout={handleLogout} userId={userId} />} />
+              </Routes>
+            </main>
 
-          <footer className="bg-zinc-50 border-t border-black/5 py-12 mt-20">
-            <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8 text-start">
-              <div className="col-span-1 md:col-span-2">
-                <div className="text-2xl font-bold tracking-tighter flex items-center gap-2 mb-4">
-                  <JeetkLogo className="w-10 h-10" />
-                  <span className="logo-gradient">Jeetk</span>
+            <footer className="bg-zinc-50 border-t border-black/5 py-12 mt-20">
+              <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8 text-start">
+                <div className="col-span-1 md:col-span-2">
+                  <div className="text-2xl font-bold tracking-tighter flex items-center gap-2 mb-4">
+                    <JeetkLogo className="w-10 h-10" />
+                    <span className="logo-gradient">Jeetk</span>
+                  </div>
+                  <p className="text-zinc-500 max-w-sm">
+                    {t.footer.tagline}
+                  </p>
                 </div>
-                <p className="text-zinc-500 max-w-sm">
-                  {t.footer.tagline}
-                </p>
+                <div>
+                  <h4 className="font-bold mb-4">{t.footer.quickLinks}</h4>
+                  <ul className="space-y-2 text-zinc-500 text-sm">
+                    <li><Link to="/">{t.footer.home}</Link></li>
+                    <li><Link to="/locations">{t.footer.locations}</Link></li>
+                    <li><Link to="/routes">{t.footer.deliveryPrices}</Link></li>
+                    <li><Link to="/cart">{t.footer.cart}</Link></li>
+                    <li><Link to="/tracking">{t.footer.trackOrder}</Link></li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-bold mb-4">{t.footer.support}</h4>
+                  <ul className="space-y-2 text-zinc-500 text-sm">
+                    <li>{t.footer.helpCenter}</li>
+                    <li>{t.footer.contactUs}</li>
+                    <li>{t.footer.privacyPolicy}</li>
+                  </ul>
+                </div>
               </div>
-              <div>
-                <h4 className="font-bold mb-4">{t.footer.quickLinks}</h4>
-                <ul className="space-y-2 text-zinc-500 text-sm">
-                  <li><Link to="/">{t.footer.home}</Link></li>
-                  <li><Link to="/locations">{t.footer.locations}</Link></li>
-                  <li><Link to="/routes">{t.footer.deliveryPrices}</Link></li>
-                  <li><Link to="/cart">{t.footer.cart}</Link></li>
-                  <li><Link to="/tracking">{t.footer.trackOrder}</Link></li>
-                </ul>
+              <div className="max-w-7xl mx-auto px-4 pt-12 mt-12 border-t border-black/5 text-center text-zinc-400 text-xs">
+                © 2026 Jeetk. {t.footer.rights}
               </div>
-              <div>
-                <h4 className="font-bold mb-4">{t.footer.support}</h4>
-                <ul className="space-y-2 text-zinc-500 text-sm">
-                  <li>{t.footer.helpCenter}</li>
-                  <li>{t.footer.contactUs}</li>
-                  <li>{t.footer.privacyPolicy}</li>
-                </ul>
-              </div>
-            </div>
-            <div className="max-w-7xl mx-auto px-4 pt-12 mt-12 border-t border-black/5 text-center text-zinc-400 text-xs">
-              © 2026 Jeetk. {t.footer.rights}
-            </div>
-          </footer>
-        </div>
-      </Router>
-    </LanguageContext.Provider>
+            </footer>
+          </div>
+          <ToastContainer toasts={toasts} removeToast={removeToast} />
+        </Router>
+      </LanguageContext.Provider>
+    </ToastContext.Provider>
   );
 }

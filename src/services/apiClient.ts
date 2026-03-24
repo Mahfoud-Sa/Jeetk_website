@@ -38,9 +38,21 @@ apiClient.interceptors.request.use(
 );
 
 // Add interceptor to return data directly as expected by the service functions
+let errorCallback: ((message: string) => void) | null = null;
+
+export const setGlobalErrorHandler = (callback: (message: string) => void) => {
+  errorCallback = callback;
+};
+
 apiClient.interceptors.response.use(
   (response) => response.data,
-  (error) => Promise.reject(error)
+  (error) => {
+    const message = error.response?.data?.message || error.message || "An unexpected error occurred";
+    if (errorCallback) {
+      errorCallback(message);
+    }
+    return Promise.reject(error);
+  }
 );
 
 export default apiClient;

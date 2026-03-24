@@ -17,6 +17,24 @@ export interface LoginResponse {
   roles: (string | any)[];
 }
 
+export interface DeliveryRegisterRequest {
+  name: string;
+  birthDate: string;
+  email: string;
+  password: string;
+  phoneNumber: string;
+  address: string;
+  username: string;
+  phoneNumbers: {
+    number: string;
+    type: string;
+  }[];
+}
+
+export const registerDelivery = async (data: DeliveryRegisterRequest): Promise<any> => {
+  return apiClient.post("Auth/register/delivery", data);
+};
+
 export const login = async (credentials: LoginRequest): Promise<LoginResponse> => {
   return apiClient.post("Auth/login", credentials);
 };
