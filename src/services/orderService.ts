@@ -17,12 +17,12 @@ export const fetchOrderById = async (id: number): Promise<Order> => {
 };
 
 export const fetchOrderHistory = async (id: number): Promise<ActionEntity[]> => {
-  const response = await apiClient.get(`Actions`, {
+  const response = await apiClient.get(`Actions/entity`, {
     params: { 
-      page: 1, 
-      pageSize: 100,
+      entityName: 'OrderEntity',
       entityId: id,
-      entityName: 'OrderEntity'
+      page: 1, 
+      pageSize: 100
     }
   });
   if (Array.isArray(response)) return response;
