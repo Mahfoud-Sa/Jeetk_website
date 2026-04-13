@@ -61,6 +61,20 @@ export interface Order {
   updatedAt?: string;
 }
 
+export type ActionType = 'Create' | 'Update' | 'Delete';
+
+export interface ActionEntity {
+  id: number;
+  userId: number | null;
+  actionType: ActionType;
+  entityName: string;
+  entityId: number;
+  oldValues: string | null;
+  newValues: string | null;
+  timestamp: string;
+  user?: User | null;
+}
+
 export interface CreateOrderRequest {
   deliveryPrice: number;
   description: string;

@@ -34,10 +34,12 @@ import {
   UserPlus,
   AlertCircle,
   Truck,
-  Eye
+  Eye,
+  EyeOff,
+  History
 } from 'lucide-react';
 import { RESTAURANTS, MENU_ITEMS } from './constants';
-import { Restaurant, MenuItem, CartItem, Order, Location, LocationRequest, DeliveryRoute } from './types';
+import { Restaurant, MenuItem, CartItem, Order, Location, LocationRequest, DeliveryRoute, ActionEntity } from './types';
 import { translations, Language } from './i18n';
 import { 
   useLocations, 
@@ -62,7 +64,8 @@ import {
   useOrders,
   createOrder,
   updateOrder,
-  deleteOrder
+  deleteOrder,
+  useOrderHistory
 } from './services/orderService';
 import { login, setToken, assignRole, registerDelivery, DeliveryRegisterRequest } from './services/authService';
 import { setGlobalErrorHandler } from './services/apiClient';
@@ -1121,6 +1124,7 @@ const DeliveryRegistrationPage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const updatePhoneNumber = (index: number, field: 'number' | 'type', value: string) => {
@@ -1333,14 +1337,27 @@ const DeliveryRegistrationPage = () => {
 
           <div>
             <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'كلمة المرور' : 'Password'}</label>
-            <input 
-              type="password" 
-              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-              placeholder="••••••••"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required
-            />
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"} 
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all pr-12"
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
+              />
+              <button
+                type="button"
+                onMouseDown={() => setShowPassword(true)}
+                onMouseUp={() => setShowPassword(false)}
+                onMouseLeave={() => setShowPassword(false)}
+                onTouchStart={() => setShowPassword(true)}
+                onTouchEnd={() => setShowPassword(false)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
           
           {error && (
@@ -1378,6 +1395,12 @@ const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string, id: n
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [resetStep, setResetStep] = useState<'email' | 'newPassword'>('email');
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
@@ -1456,16 +1479,41 @@ const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string, id: n
             />
           </div>
           <div>
-            <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'كلمة المرور' : 'Password'}</label>
-            <input 
-              type="password" 
-              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={isLoading}
-            />
+            <div className="flex justify-between items-center mb-1.5 ml-1">
+              <label className="block text-sm font-bold">{language === 'ar' ? 'كلمة المرور' : 'Password'}</label>
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowForgotModal(true);
+                  setResetStep('email');
+                }}
+                className="text-xs font-bold text-primary hover:underline"
+              >
+                {language === 'ar' ? 'نسيت كلمة المرور؟' : 'Forgot Password?'}
+              </button>
+            </div>
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"} 
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all pr-12"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onMouseDown={() => setShowPassword(true)}
+                onMouseUp={() => setShowPassword(false)}
+                onMouseLeave={() => setShowPassword(false)}
+                onTouchStart={() => setShowPassword(true)}
+                onTouchEnd={() => setShowPassword(false)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
           
           {error && (
@@ -1499,11 +1547,103 @@ const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string, id: n
           </div>
         </form>
       </motion.div>
+
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl relative"
+          >
+            <button 
+              onClick={() => setShowForgotModal(false)}
+              className="absolute right-6 top-6 p-2 hover:bg-zinc-100 rounded-full transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-8 h-8 text-primary" />
+              </div>
+              <h2 className="text-2xl font-bold">
+                {resetStep === 'email' 
+                  ? (language === 'ar' ? 'نسيت كلمة المرور' : 'Forgot Password')
+                  : (language === 'ar' ? 'إعادة تعيين كلمة المرور' : 'Reset Password')}
+              </h2>
+              <p className="text-zinc-500 text-sm mt-2">
+                {resetStep === 'email'
+                  ? (language === 'ar' ? 'أدخل بريدك الإلكتروني لتلقي رابط إعادة التعيين' : 'Enter your email to receive a reset link')
+                  : (language === 'ar' ? 'أدخل كلمة المرور الجديدة الخاصة بك' : 'Enter your new password below')}
+              </p>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (resetStep === 'email') {
+                setResetStep('newPassword');
+              } else {
+                alert(language === 'ar' ? 'تم تغيير كلمة المرور بنجاح!' : 'Password changed successfully!');
+                setShowForgotModal(false);
+              }
+            }} className="space-y-4">
+              {resetStep === 'email' ? (
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'البريد الإلكتروني' : 'Email Address'}</label>
+                  <input 
+                    type="email" 
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    placeholder="your@email.com"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'كلمة المرور الجديدة' : 'New Password'}</label>
+                  <div className="relative">
+                    <input 
+                      type={showNewPassword ? "text" : "password"} 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all pr-12"
+                      placeholder="••••••••"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onMouseDown={() => setShowNewPassword(true)}
+                      onMouseUp={() => setShowNewPassword(false)}
+                      onMouseLeave={() => setShowNewPassword(false)}
+                      onTouchStart={() => setShowNewPassword(true)}
+                      onTouchEnd={() => setShowNewPassword(false)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                    >
+                      {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <button 
+                type="submit"
+                className="w-full bg-black text-white py-4 rounded-xl font-bold hover:scale-[1.02] transition-transform"
+              >
+                {resetStep === 'email' 
+                  ? (language === 'ar' ? 'إرسال الرابط' : 'Send Link')
+                  : (language === 'ar' ? 'تحديث كلمة المرور' : 'Update Password')}
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
 
-const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete }: { role: UserRole, orders: any[], onUpdateStatus: (id: number, status: string) => void, onEdit?: (order: any) => void, onDelete?: (id: number) => void }) => {
+const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete, onViewHistory }: { role: UserRole, orders: any[], onUpdateStatus: (id: number, status: string) => void, onEdit?: (order: any) => void, onDelete?: (id: number) => void, onViewHistory?: (id: number) => void }) => {
   const { t, language } = useLanguage();
 
   const getStatusColor = (status: string) => {
@@ -1533,22 +1673,22 @@ const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete }: { r
         <tbody className="divide-y divide-zinc-50">
           {orders.map((order, index) => (
             <tr key={order.id || index} className="hover:bg-zinc-50/50 transition-colors">
-              <td className="px-6 py-4 text-sm font-bold">#ORD-{order.id?.toString().padStart(4, '0') || '0000'}</td>
+              <td className="px-6 py-4 text-sm font-bold">#ORD-{(order.id || order.Id)?.toString().padStart(4, '0') || '0000'}</td>
               <td className="px-6 py-4 text-sm">
-                <div className="max-w-[200px] truncate" title={order.description}>
-                  {order.description}
+                <div className="max-w-[200px] truncate" title={order.description || order.Description}>
+                  {order.description || order.Description}
                 </div>
               </td>
-              <td className="px-6 py-4 text-sm text-zinc-500">{order.deliveryName || '-'}</td>
+              <td className="px-6 py-4 text-sm text-zinc-500">{order.deliveryName || order.DeliveryName || '-'}</td>
               <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusColor(order.orderState || order.status)}`}>
-                    {(t.dashboard as any)[order.orderState || order.status] || order.orderState || order.status}
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusColor(order.orderState || order.OrderState || order.status || order.Status)}`}>
+                    {(t.dashboard as any)[order.orderState || order.OrderState || order.status || order.Status] || order.orderState || order.OrderState || order.status || order.Status}
                   </span>
                   <select 
                     className="text-[10px] font-bold bg-zinc-50 border border-zinc-100 rounded-lg px-2 py-1 focus:outline-none"
-                    value={order.orderState || order.status || 'pending'}
-                    onChange={(e) => onUpdateStatus(order.id, e.target.value)}
+                    value={order.orderState || order.OrderState || order.status || order.Status || 'pending'}
+                    onChange={(e) => onUpdateStatus(order.id || order.Id, e.target.value)}
                   >
                     <option value="pending">{t.dashboard.pending}</option>
                     <option value="preparing">{t.dashboard.preparing}</option>
@@ -1558,9 +1698,18 @@ const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete }: { r
                   </select>
                 </div>
               </td>
-              <td className="px-6 py-4 text-sm font-bold text-right">${(order.deliveryPrice || 0).toFixed(2)}</td>
+              <td className="px-6 py-4 text-sm font-bold text-right">${(order.deliveryPrice || order.DeliveryPrice || 0).toFixed(2)}</td>
               <td className="px-6 py-4 text-right">
                 <div className="flex justify-end gap-2">
+                  {onViewHistory && (
+                    <button 
+                      onClick={() => onViewHistory(order.id || order.Id)}
+                      className="p-2 text-zinc-400 hover:text-primary transition-colors"
+                      title={language === 'ar' ? 'السجل' : 'History'}
+                    >
+                      <History className="w-4 h-4" />
+                    </button>
+                  )}
                   {onEdit && (
                     <button 
                       onClick={() => onEdit(order)}
@@ -1572,7 +1721,7 @@ const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete }: { r
                   )}
                   {onDelete && (
                     <button 
-                      onClick={() => onDelete(order.id)}
+                      onClick={() => onDelete(order.id || order.Id)}
                       className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
                       title={t.common.delete}
                     >
@@ -1608,6 +1757,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
   const [editingLocation, setEditingLocation] = useState<any>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [orderForm, setOrderForm] = useState({
     deliveryPrice: 0,
     description: '',
@@ -1629,6 +1779,11 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
     role: 'customer' as UserRole, 
     status: 'active' 
   });
+
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyOrderId, setHistoryOrderId] = useState<number | null>(null);
+  const { data: orderHistoryData = [], isLoading: isHistoryLoading } = useOrderHistory(historyOrderId);
+  const orderHistory = Array.isArray(orderHistoryData) ? orderHistoryData : [];
 
   const { data: ordersData = [], refetch: refetchOrders } = useOrders();
   const orders = Array.isArray(ordersData) ? ordersData : [];
@@ -1707,6 +1862,11 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
       deliveryName: order.deliveryName || ''
     });
     setShowOrderModal(true);
+  };
+
+  const handleViewHistory = (id: number) => {
+    setHistoryOrderId(id);
+    setShowHistoryModal(true);
   };
 
   const filteredUsers = users.filter((user: any) => {
@@ -1955,6 +2115,16 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                 <p className="text-4xl font-black">{locations.length}</p>
               </div>
               <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <p className="text-zinc-500 text-sm mb-1">{t.dashboard.totalOrders}</p>
+                <p className="text-4xl font-black text-primary">{orders.length}</p>
+              </div>
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
+                <p className="text-zinc-500 text-sm mb-1">{t.dashboard.totalIncome}</p>
+                <p className="text-4xl font-black text-emerald-500">
+                  ${orders.reduce((sum: number, order: any) => sum + (order.deliveryPrice || 0), 0).toFixed(2)}
+                </p>
+              </div>
+              <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
                 <p className="text-zinc-500 text-sm mb-1">{t.dashboard.activeHubs}</p>
                 <p className="text-4xl font-black text-emerald-500">{locations.length}</p>
               </div>
@@ -2130,25 +2300,51 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-zinc-500 mb-1">{t.dashboard.userPassword}</label>
-                          <input 
-                            type="password" 
-                            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
-                            value={userForm.password}
-                            onChange={e => setUserForm({ ...userForm, password: e.target.value })}
-                            required={!editingUser}
-                            placeholder={editingUser ? "Leave blank to keep same" : ""}
-                          />
+                          <div className="relative">
+                            <input 
+                              type={showPassword ? "text" : "password"} 
+                              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none pr-12"
+                              value={userForm.password}
+                              onChange={e => setUserForm({ ...userForm, password: e.target.value })}
+                              required={!editingUser}
+                              placeholder={editingUser ? "Leave blank to keep same" : ""}
+                            />
+                            <button
+                              type="button"
+                              onMouseDown={() => setShowPassword(true)}
+                              onMouseUp={() => setShowPassword(false)}
+                              onMouseLeave={() => setShowPassword(false)}
+                              onTouchStart={() => setShowPassword(true)}
+                              onTouchEnd={() => setShowPassword(false)}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                            >
+                              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
                         </div>
                         {!editingUser && (
                           <div>
                             <label className="block text-sm font-medium text-zinc-500 mb-1">Confirm Password</label>
-                            <input 
-                              type="password" 
-                              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
-                              value={userForm.confirmPassword}
-                              onChange={e => setUserForm({ ...userForm, confirmPassword: e.target.value })}
-                              required
-                            />
+                            <div className="relative">
+                              <input 
+                                type={showPassword ? "text" : "password"} 
+                                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none pr-12"
+                                value={userForm.confirmPassword}
+                                onChange={e => setUserForm({ ...userForm, confirmPassword: e.target.value })}
+                                required
+                              />
+                              <button
+                                type="button"
+                                onMouseDown={() => setShowPassword(true)}
+                                onMouseUp={() => setShowPassword(false)}
+                                onMouseLeave={() => setShowPassword(false)}
+                                onTouchStart={() => setShowPassword(true)}
+                                onTouchEnd={() => setShowPassword(false)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                              >
+                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                              </button>
+                            </div>
                           </div>
                         )}
                         <div>
@@ -2658,6 +2854,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
               onUpdateStatus={handleUpdateOrderStatus} 
               onEdit={openEditOrder}
               onDelete={handleDeleteOrder}
+              onViewHistory={handleViewHistory}
             />
           </div>
         )}
@@ -2775,6 +2972,105 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                     </button>
                   </div>
                 </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Order History Modal */}
+        <AnimatePresence>
+          {showHistoryModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="bg-white w-full max-w-4xl rounded-3xl p-8 shadow-2xl max-h-[80vh] overflow-hidden flex flex-col"
+              >
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold">{language === 'ar' ? 'سجل تغييرات الطلب' : 'Order Change History'}</h2>
+                    <p className="text-zinc-500 text-sm">#ORD-{historyOrderId?.toString().padStart(4, '0')}</p>
+                  </div>
+                  <button onClick={() => setShowHistoryModal(false)} className="p-2 hover:bg-zinc-100 rounded-full">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                  {isHistoryLoading ? (
+                    <div className="flex justify-center py-12">
+                      <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    </div>
+                  ) : orderHistory.length === 0 ? (
+                    <div className="text-center py-12 text-zinc-400">
+                      {language === 'ar' ? 'لا يوجد سجل لهذا الطلب' : 'No history found for this order.'}
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {orderHistory.map((action) => (
+                        <div key={action.id} className="relative pl-8 border-l-2 border-zinc-100 pb-6 last:pb-0">
+                          <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white border-2 border-primary" />
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                action.actionType === 'Create' ? 'bg-emerald-100 text-emerald-700' :
+                                action.actionType === 'Update' ? 'bg-blue-100 text-blue-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                {action.actionType}
+                              </span>
+                              <span className="ml-2 text-sm font-bold">{action.user?.fullName || action.user?.name || 'System'}</span>
+                            </div>
+                            <span className="text-xs text-zinc-400">{new Date(action.timestamp).toLocaleString()}</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                            {action.oldValues && (
+                              <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-100">
+                                <p className="text-[10px] font-bold text-zinc-400 uppercase mb-2">Old Values</p>
+                                <pre className="text-xs overflow-x-auto whitespace-pre-wrap font-mono">
+                                  {(() => {
+                                    if (typeof action.oldValues === 'object') {
+                                      return JSON.stringify(action.oldValues, null, 2);
+                                    }
+                                    try {
+                                      return JSON.stringify(JSON.parse(action.oldValues as string), null, 2);
+                                    } catch (e) {
+                                      return action.oldValues;
+                                    }
+                                  })()}
+                                </pre>
+                              </div>
+                            )}
+                            {action.newValues && (
+                              <div className="bg-primary/5 p-3 rounded-xl border border-primary/10">
+                                <p className="text-[10px] font-bold text-primary/60 uppercase mb-2">New Values</p>
+                                <pre className="text-xs overflow-x-auto whitespace-pre-wrap font-mono">
+                                  {(() => {
+                                    if (typeof action.newValues === 'object') {
+                                      return JSON.stringify(action.newValues, null, 2);
+                                    }
+                                    try {
+                                      return JSON.stringify(JSON.parse(action.newValues as string), null, 2);
+                                    } catch (e) {
+                                      return action.newValues;
+                                    }
+                                  })()}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </motion.div>
             </motion.div>
           )}
@@ -3252,16 +3548,20 @@ const DeliveryDashboard = ({ userId }: { userId: number | null }) => {
             <h1 className="text-3xl font-bold">{t.dashboard.deliveryTitle}</h1>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-2">Active Deliveries</h3>
-                <p className="text-3xl font-black text-primary">12</p>
+                <h3 className="font-bold mb-2">{t.dashboard.totalOrders}</h3>
+                <p className="text-3xl font-black text-primary">{orders.length}</p>
               </div>
               <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-2">Completed Today</h3>
-                <p className="text-3xl font-black text-primary">45</p>
+                <h3 className="font-bold mb-2">{t.dashboard.totalIncome}</h3>
+                <p className="text-3xl font-black text-primary">
+                  ${orders.reduce((sum: number, o: any) => sum + (o.deliveryPrice || 0), 0).toFixed(2)}
+                </p>
               </div>
               <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
-                <h3 className="font-bold mb-2">Earnings Today</h3>
-                <p className="text-3xl font-black text-primary">$180.50</p>
+                <h3 className="font-bold mb-2">{t.dashboard.systemStatus}</h3>
+                <p className="text-xl font-bold text-emerald-500 flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5" /> {t.dashboard.operational}
+                </p>
               </div>
             </div>
           </div>
@@ -3285,21 +3585,20 @@ const DeliveryDashboard = ({ userId }: { userId: number | null }) => {
   );
 };
 
-const Dashboard = ({ onLogout, userId }: { onLogout: () => void, userId: number | null }) => {
+const Dashboard = ({ onLogout, userId, isAuthenticated }: { onLogout: () => void, userId: number | null, isAuthenticated: boolean }) => {
   const { t } = useLanguage();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [role, setRole] = useState<UserRole | null>(null);
   
   useEffect(() => {
-    const isAuth = localStorage.getItem('jeetk_admin_auth') === 'true';
     const savedRole = localStorage.getItem('jeetk_user_role') as UserRole;
-    if (!isAuth) {
+    if (!isAuthenticated) {
       navigate('/login');
     } else {
       setRole(savedRole);
     }
-  }, [navigate]);
+  }, [navigate, isAuthenticated]);
 
   const { data: locationsData = [], refetch: refetchLocations } = useLocations();
   const locations = Array.isArray(locationsData) ? locationsData : [];
@@ -3463,18 +3762,11 @@ export default function App() {
 
   const t = translations[language];
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('jeetk_admin_auth') === 'true';
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
-  const [userRole, setUserRole] = useState<UserRole | null>(() => {
-    return localStorage.getItem('jeetk_user_role') as UserRole;
-  });
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
 
-  const [userId, setUserId] = useState<number | null>(() => {
-    const savedId = localStorage.getItem('jeetk_user_id');
-    return savedId ? parseInt(savedId) : null;
-  });
+  const [userId, setUserId] = useState<number | null>(null);
 
   const handleLogin = (role: UserRole, email: string, id: number) => {
     localStorage.setItem('jeetk_admin_auth', 'true');
@@ -3539,7 +3831,7 @@ export default function App() {
                 <Route path="/routes" element={<DeliveryRoutesPage />} />
                 <Route path="/register/delivery" element={<DeliveryRegistrationPage />} />
                 <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
-                <Route path="/dashboard" element={<Dashboard onLogout={handleLogout} userId={userId} />} />
+                <Route path="/dashboard" element={<Dashboard onLogout={handleLogout} userId={userId} isAuthenticated={isAuthenticated} />} />
               </Routes>
             </main>
 
