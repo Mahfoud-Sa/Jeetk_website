@@ -67,6 +67,7 @@ import {
   deleteOrder,
   useOrderHistory
 } from './services/orderService';
+import { useActions } from './services/actionService';
 import { login, setToken, assignRole, registerDelivery, DeliveryRegisterRequest } from './services/authService';
 import { setGlobalErrorHandler } from './services/apiClient';
 import { ToastContainer, ToastType } from './components/Toast';
@@ -1672,7 +1673,7 @@ const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete, onVie
         </thead>
         <tbody className="divide-y divide-zinc-50">
           {orders.map((order, index) => (
-            <tr key={order.id || index} className="hover:bg-zinc-50/50 transition-colors">
+            <tr key={order.id || order.Id || index} className="hover:bg-zinc-50/50 transition-colors">
               <td className="px-6 py-4 text-sm font-bold">#ORD-{(order.id || order.Id)?.toString().padStart(4, '0') || '0000'}</td>
               <td className="px-6 py-4 text-sm">
                 <div className="max-w-[200px] truncate" title={order.description || order.Description}>
@@ -1743,12 +1744,158 @@ const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete, onVie
   );
 };
 
+const SystemHistoryManagement = () => {
+  const { t, language } = useLanguage();
+  const { data: actionsData = [], isLoading } = useActions();
+  const actions = Array.isArray(actionsData) ? actionsData : [];
+  const [selectedAction, setSelectedAction] = useState<any>(null);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-bold flex items-center gap-2">
+          <History className="w-6 h-6 text-primary" />
+          {language === 'ar' ? 'سجل النظام' : 'System History'}
+        </h3>
+      </div>
+
+      <div className="bg-white border border-zinc-100 rounded-3xl overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-zinc-50 border-b border-zinc-100">
+                <th className="px-6 py-4 font-bold text-sm">{language === 'ar' ? 'المستخدم' : 'User'}</th>
+                <th className="px-6 py-4 font-bold text-sm">{language === 'ar' ? 'النوع' : 'Type'}</th>
+                <th className="px-6 py-4 font-bold text-sm">{language === 'ar' ? 'الكيان' : 'Entity'}</th>
+                <th className="px-6 py-4 font-bold text-sm">{language === 'ar' ? 'المعرف' : 'ID'}</th>
+                <th className="px-6 py-4 font-bold text-sm">{language === 'ar' ? 'الوقت' : 'Time'}</th>
+                <th className="px-6 py-4 font-bold text-sm text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-50">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+                  </td>
+                </tr>
+              ) : actions.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-400">
+                    {language === 'ar' ? 'لا يوجد سجلات' : 'No history records found.'}
+                  </td>
+                </tr>
+              ) : (
+                actions.map((action: any) => (
+                  <tr key={action.id || action.Id} className="hover:bg-zinc-50/50 transition-colors">
+                    <td className="px-6 py-4 text-sm">
+                      <div className="font-bold">
+                        {(action.user || action.User)?.fullName || (action.user || action.User)?.FullName || (action.user || action.User)?.name || (action.user || action.User)?.Name || 'System'}
+                      </div>
+                      <div className="text-xs text-zinc-400">ID: {action.userId || action.UserId || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        (action.actionType || action.ActionType) === 'Create' ? 'bg-emerald-100 text-emerald-700' :
+                        (action.actionType || action.ActionType) === 'Update' ? 'bg-blue-100 text-blue-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {action.actionType || action.ActionType}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium">{action.entityName || action.EntityName}</td>
+                    <td className="px-6 py-4 text-sm font-mono">#{action.entityId || action.EntityId}</td>
+                    <td className="px-6 py-4 text-sm text-zinc-500">
+                      {new Date(action.timestamp || action.Timestamp).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button 
+                        onClick={() => setSelectedAction(action)}
+                        className="p-2 text-zinc-400 hover:text-primary transition-colors"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Action Detail Modal */}
+      <AnimatePresence>
+        {selectedAction && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-4xl rounded-3xl p-8 shadow-2xl max-h-[80vh] overflow-hidden flex flex-col"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold">{language === 'ar' ? 'تفاصيل السجل' : 'History Details'}</h2>
+                  <p className="text-zinc-500 text-sm">
+                    {selectedAction.entityName || selectedAction.EntityName} #{selectedAction.entityId || selectedAction.EntityId}
+                  </p>
+                </div>
+                <button onClick={() => setSelectedAction(null)} className="p-2 hover:bg-zinc-100 rounded-full">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(selectedAction.oldValues || selectedAction.OldValues) && (
+                    <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase mb-3">Old Values</p>
+                      <pre className="text-xs overflow-x-auto whitespace-pre-wrap font-mono">
+                        {(() => {
+                          const val = selectedAction.oldValues || selectedAction.OldValues;
+                          if (typeof val === 'object') return JSON.stringify(val, null, 2);
+                          try { return JSON.stringify(JSON.parse(val as string), null, 2); } catch (e) { return val; }
+                        })()}
+                      </pre>
+                    </div>
+                  )}
+                  {(selectedAction.newValues || selectedAction.NewValues) && (
+                    <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
+                      <p className="text-[10px] font-bold text-primary/60 uppercase mb-3">New Values</p>
+                      <pre className="text-xs overflow-x-auto whitespace-pre-wrap font-mono">
+                        {(() => {
+                          const val = selectedAction.newValues || selectedAction.NewValues;
+                          if (typeof val === 'object') return JSON.stringify(val, null, 2);
+                          try { return JSON.stringify(JSON.parse(val as string), null, 2); } catch (e) { return val; }
+                        })()}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOriginId, handleCreateLocation, handleDeleteLocation, handleUpdateLocation, handleCreateRoute, handleDeleteRoute, newLocation, setNewLocation, newRoute, setNewRoute, userId }: any) => {
   const { t, language } = useLanguage();
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'routes' | 'users' | 'orders' | 'profile'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'routes' | 'users' | 'orders' | 'profile' | 'history'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+  const [orderSearchTerm, setOrderSearchTerm] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string | 'all'>('all');
   const [showUserModal, setShowUserModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingUser, setViewingUser] = useState<any>(null);
@@ -1786,7 +1933,16 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
   const orderHistory = Array.isArray(orderHistoryData) ? orderHistoryData : [];
 
   const { data: ordersData = [], refetch: refetchOrders } = useOrders();
-  const orders = Array.isArray(ordersData) ? ordersData : [];
+  const orders = Array.isArray(ordersData) ? ordersData.filter((order: any) => {
+    const matchesSearch = (order.description || order.Description || '').toLowerCase().includes(orderSearchTerm.toLowerCase()) || 
+                          (order.deliveryName || order.DeliveryName || '').toLowerCase().includes(orderSearchTerm.toLowerCase()) ||
+                          (order.id || order.Id || '').toString().includes(orderSearchTerm);
+    
+    const currentStatus = order.orderState || order.OrderState || order.status || order.Status || 'pending';
+    const matchesStatus = orderStatusFilter === 'all' || currentStatus === orderStatusFilter;
+    
+    return matchesSearch && matchesStatus;
+  }) : [];
 
   const { data: usersData = [], refetch: refetchUsers } = useUsers();
   const users = Array.isArray(usersData) ? usersData : [];
@@ -2095,6 +2251,12 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
           className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
         >
           <ShoppingBag className="w-4 h-4" /> {t.dashboard.orders}
+        </button>
+        <button 
+          onClick={() => setActiveTab('history')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'history' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
+        >
+          <History className="w-4 h-4" /> {language === 'ar' ? 'السجل' : 'History'}
         </button>
         <button 
           onClick={() => setActiveTab('profile')}
@@ -2848,6 +3010,32 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                 {language === 'ar' ? 'طلب جديد' : 'New Order'}
               </button>
             </div>
+
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                <input 
+                  type="text" 
+                  placeholder={language === 'ar' ? 'البحث في الطلبات...' : 'Search orders...'}
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  value={orderSearchTerm}
+                  onChange={(e) => setOrderSearchTerm(e.target.value)}
+                />
+              </div>
+              <select 
+                className="px-4 py-3 bg-white border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                value={orderStatusFilter}
+                onChange={(e) => setOrderStatusFilter(e.target.value)}
+              >
+                <option value="all">{language === 'ar' ? 'جميع الحالات' : 'All Statuses'}</option>
+                <option value="pending">{t.dashboard.pending}</option>
+                <option value="preparing">{t.dashboard.preparing}</option>
+                <option value="onTheWay">{t.dashboard.onTheWay}</option>
+                <option value="delivered">{t.dashboard.delivered}</option>
+                <option value="cancelled">{t.dashboard.cancelled}</option>
+              </select>
+            </div>
+
             <OrderManagement 
               role="admin" 
               orders={orders} 
@@ -2857,6 +3045,10 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
               onViewHistory={handleViewHistory}
             />
           </div>
+        )}
+
+        {activeTab === 'history' && (
+          <SystemHistoryManagement />
         )}
 
         {activeTab === 'profile' && userId && (
@@ -3013,53 +3205,63 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                     </div>
                   ) : (
                     <div className="space-y-6">
-                      {orderHistory.map((action) => (
-                        <div key={action.id} className="relative pl-8 border-l-2 border-zinc-100 pb-6 last:pb-0">
+                      {orderHistory.map((action: any) => (
+                        <div key={action.id || action.Id} className="relative pl-8 border-l-2 border-zinc-100 pb-6 last:pb-0">
                           <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white border-2 border-primary" />
                           <div className="flex justify-between items-start mb-2">
                             <div>
                               <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                action.actionType === 'Create' ? 'bg-emerald-100 text-emerald-700' :
-                                action.actionType === 'Update' ? 'bg-blue-100 text-blue-700' :
+                                (action.actionType || action.ActionType) === 'Create' ? 'bg-emerald-100 text-emerald-700' :
+                                (action.actionType || action.ActionType) === 'Update' ? 'bg-blue-100 text-blue-700' :
                                 'bg-red-100 text-red-700'
                               }`}>
-                                {action.actionType}
+                                {action.actionType || action.ActionType}
                               </span>
-                              <span className="ml-2 text-sm font-bold">{action.user?.fullName || action.user?.name || 'System'}</span>
+                              <span className="ml-2 text-sm font-bold">
+                                {(action.user || action.User)?.fullName || 
+                                 (action.user || action.User)?.FullName || 
+                                 (action.user || action.User)?.name || 
+                                 (action.user || action.User)?.Name || 
+                                 'System'}
+                              </span>
                             </div>
-                            <span className="text-xs text-zinc-400">{new Date(action.timestamp).toLocaleString()}</span>
+                            <span className="text-xs text-zinc-400">
+                              {new Date(action.timestamp || action.Timestamp).toLocaleString()}
+                            </span>
                           </div>
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-                            {action.oldValues && (
+                            {(action.oldValues || action.OldValues) && (
                               <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-100">
                                 <p className="text-[10px] font-bold text-zinc-400 uppercase mb-2">Old Values</p>
                                 <pre className="text-xs overflow-x-auto whitespace-pre-wrap font-mono">
                                   {(() => {
-                                    if (typeof action.oldValues === 'object') {
-                                      return JSON.stringify(action.oldValues, null, 2);
+                                    const val = action.oldValues || action.OldValues;
+                                    if (typeof val === 'object') {
+                                      return JSON.stringify(val, null, 2);
                                     }
                                     try {
-                                      return JSON.stringify(JSON.parse(action.oldValues as string), null, 2);
+                                      return JSON.stringify(JSON.parse(val as string), null, 2);
                                     } catch (e) {
-                                      return action.oldValues;
+                                      return val;
                                     }
                                   })()}
                                 </pre>
                               </div>
                             )}
-                            {action.newValues && (
+                            {(action.newValues || action.NewValues) && (
                               <div className="bg-primary/5 p-3 rounded-xl border border-primary/10">
                                 <p className="text-[10px] font-bold text-primary/60 uppercase mb-2">New Values</p>
                                 <pre className="text-xs overflow-x-auto whitespace-pre-wrap font-mono">
                                   {(() => {
-                                    if (typeof action.newValues === 'object') {
-                                      return JSON.stringify(action.newValues, null, 2);
+                                    const val = action.newValues || action.NewValues;
+                                    if (typeof val === 'object') {
+                                      return JSON.stringify(val, null, 2);
                                     }
                                     try {
-                                      return JSON.stringify(JSON.parse(action.newValues as string), null, 2);
+                                      return JSON.stringify(JSON.parse(val as string), null, 2);
                                     } catch (e) {
-                                      return action.newValues;
+                                      return val;
                                     }
                                   })()}
                                 </pre>
@@ -3109,7 +3311,7 @@ const RestaurantOwnerDashboard = ({ userId }: { userId: number | null }) => {
   ]);
 
   const handleUpdateOrderStatus = (id: number, status: string) => {
-    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
+    setOrders(orders.map(o => o.id === id ? { ...o, orderState: status, status } : o));
   };
 
   const [isAddingMeal, setIsAddingMeal] = useState(false);
@@ -3516,7 +3718,7 @@ const DeliveryDashboard = ({ userId }: { userId: number | null }) => {
   ]);
 
   const handleUpdateOrderStatus = (id: number, status: string) => {
-    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
+    setOrders(orders.map(o => o.id === id ? { ...o, orderState: status, status } : o));
   };
 
   return (
