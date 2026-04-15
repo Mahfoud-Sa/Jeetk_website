@@ -64,6 +64,7 @@ import {
   useOrders,
   createOrder,
   updateOrder,
+  updateOrderState,
   deleteOrder,
   useOrderHistory
 } from './services/orderService';
@@ -1949,7 +1950,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
 
   const handleUpdateOrderStatus = async (id: number, status: string) => {
     try {
-      await updateOrder(id, { orderState: status });
+      await updateOrderState(id, status);
       refetchOrders();
       showToast("Order status updated!", "success");
     } catch (error) {

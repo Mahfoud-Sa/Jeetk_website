@@ -56,6 +56,10 @@ export const updateOrder = async (id: number, order: Partial<CreateOrderRequest>
   return apiClient.put(`Orders/${id}`, order);
 };
 
+export const updateOrderState = async (id: number, newState: string): Promise<void> => {
+  return apiClient.put(`Orders/${id}/update-state`, { newState });
+};
+
 export const deleteOrder = async (id: number): Promise<void> => {
   return apiClient.delete(`Orders/${id}`);
 };
