@@ -1785,7 +1785,7 @@ const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete, onVie
               return (
                 <tr key={orderId || index} className="hover:bg-zinc-50/50 transition-colors">
                   <td className="px-6 py-4 text-sm font-bold">
-                    <div>#ORD-{orderId?.toString().padStart(4, '0') || '0000'}</div>
+                    <div>{orderId}</div>
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <div className="max-w-[200px] truncate" title={order.description || order.Description}>
