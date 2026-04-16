@@ -57,6 +57,7 @@ export interface Order {
   orderState: string;
   receptionDescription: string;
   deliveryName: string;
+  deliveryTime?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -82,6 +83,7 @@ export interface CreateOrderRequest {
   orderState: string;
   receptionDescription: string;
   deliveryName: string;
+  deliveryTime: string;
 }
 
 export interface PhoneNumber {

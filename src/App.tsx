@@ -39,7 +39,7 @@ import {
   History
 } from 'lucide-react';
 import { RESTAURANTS, MENU_ITEMS } from './constants';
-import { Restaurant, MenuItem, CartItem, Order, Location, LocationRequest, DeliveryRoute, ActionEntity } from './types';
+import { Restaurant, MenuItem, CartItem, Order, Location, LocationRequest, DeliveryRoute, ActionEntity, CreateOrderRequest } from './types';
 import { translations, Language } from './i18n';
 import { 
   useLocations, 
@@ -227,7 +227,7 @@ interface RestaurantCardProps {
 }
 
 const RestaurantCard: FC<RestaurantCardProps> = ({ restaurant }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   return (
     <Link to={`/restaurant/${restaurant.id}`} className="group">
       <div className="relative aspect-[4/3] overflow-hidden rounded-2xl mb-3">
@@ -248,7 +248,7 @@ const RestaurantCard: FC<RestaurantCardProps> = ({ restaurant }) => {
           <p className="text-zinc-500 text-sm">{restaurant.category} • {restaurant.deliveryTime}</p>
         </div>
         <div className="text-end">
-          <p className="text-sm font-medium">{restaurant.deliveryFee === 0 ? t.home.freeDelivery : `$${restaurant.deliveryFee} ${t.home.deliveryFee}`}</p>
+          <p className="text-sm font-medium">{restaurant.deliveryFee === 0 ? t.home.freeDelivery : `${restaurant.deliveryFee} ${language === 'ar' ? 'ر.ي' : 'YER'} ${t.home.deliveryFee}`}</p>
         </div>
       </div>
     </Link>
@@ -276,10 +276,12 @@ const HomePage = () => {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `You are a helpful food delivery assistant. Suggest 2-3 specific dishes or restaurant types from our platform (Burgers, Sushi, Pizza, Salads, Desserts) based on this user request: "${prompt}". Keep it concise and appetizing. Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`,
+        contents: `You are a helpful food delivery assistant. Suggest 2-3 specific dishes or restaurant types from our platform (Burgers, Sushi, Pizza, Salads, Desserts) based on this user request: "${prompt}". Keep it concise and appetizing. Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`
       });
-      setAiResponse(response.text || (language === 'ar' ? 'عذراً، لم أتمكن من العثور على شيء حالياً.' : 'Sorry, I couldn\'t think of anything right now.'));
+      const text = response.text;
+      setAiResponse(text || (language === 'ar' ? 'عذراً، لم أتمكن من العثور على شيء حالياً.' : 'Sorry, I couldn\'t think of anything right now.'));
     } catch (error) {
+      console.error("AI Error:", error);
       setAiResponse(language === 'ar' ? 'خطأ في الاتصال بمساعد الذكاء الاصطناعي.' : 'Error connecting to AI assistant.');
     } finally {
       setIsAiLoading(false);
@@ -441,7 +443,7 @@ const HomePage = () => {
             <div className="bg-orange-500 rounded-3xl p-8 relative overflow-hidden group">
               <div className="relative z-10">
                 <h3 className="text-2xl font-bold text-white mb-2">Free Delivery</h3>
-                <p className="text-orange-100 text-sm mb-4">On all orders over $25 from Sushi Zen.</p>
+                <p className="text-orange-100 text-sm mb-4">On all orders over 5000 {language === 'ar' ? 'ر.ي' : 'YER'} from Sushi Zen.</p>
                 <button className="text-white border border-white/30 px-4 py-2 rounded-full text-sm font-bold hover:bg-white/10 transition-colors">Order Now</button>
               </div>
               <div className="absolute right-[-20px] bottom-[-20px] w-32 h-32 bg-orange-400 rounded-full blur-2xl opacity-50" />
@@ -544,6 +546,7 @@ const RestaurantsPage = () => {
 
 const RestaurantPage = ({ addToCart }: { addToCart: (item: MenuItem) => void }) => {
   const { id } = useParams();
+  const { language } = useLanguage();
   const restaurant = RESTAURANTS.find(r => r.id === id);
   const menu = MENU_ITEMS[id || ''] || [];
 
@@ -573,7 +576,7 @@ const RestaurantPage = ({ addToCart }: { addToCart: (item: MenuItem) => void }) 
             </div>
             <div className="flex items-center gap-1">
               <ShoppingBag className="w-4 h-4" />
-              {restaurant.deliveryFee === 0 ? 'Free Delivery' : `$${restaurant.deliveryFee} Delivery`}
+              {restaurant.deliveryFee === 0 ? 'Free Delivery' : `${restaurant.deliveryFee} ${language === 'ar' ? 'ر.ي' : 'YER'} Delivery`}
             </div>
           </div>
         </div>
@@ -586,7 +589,7 @@ const RestaurantPage = ({ addToCart }: { addToCart: (item: MenuItem) => void }) 
               <h3 className="font-semibold text-lg mb-1">{item.name}</h3>
               <p className="text-zinc-500 text-sm mb-3 line-clamp-2">{item.description}</p>
               <div className="flex items-center justify-between">
-                <span className="font-bold">${item.price}</span>
+                <span className="font-bold">{item.price} {language === 'ar' ? 'ر.ي' : 'YER'}</span>
                 <button 
                   onClick={() => addToCart(item)}
                   className="bg-black text-white w-8 h-8 rounded-full flex items-center justify-center hover:scale-110 transition-transform"
@@ -611,9 +614,33 @@ const CartPage = ({ cart, updateQuantity, clearCart }: {
   clearCart: () => void
 }) => {
   const navigate = useNavigate();
-  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const deliveryFee = 2.99;
+  const { language, t } = useLanguage();
+  const { showToast } = useToast();
+  const [deliveryTime, setDeliveryTime] = useState(new Date().toISOString());
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const deliveryFee = 500; // Updated from 2.99 to 500 YER
   const total = subtotal + deliveryFee;
+
+  const handlePlaceOrder = async () => {
+    try {
+      const orderData: CreateOrderRequest = {
+        deliveryPrice: deliveryFee,
+        description: `Order with ${cart.length} items: ${cart.map(i => i.name).join(', ')}`,
+        deliveryLocationDescription: 'Customer Address',
+        orderState: 'pending',
+        receptionDescription: 'Standard Delivery',
+        deliveryName: 'Pending Assignment',
+        deliveryTime: deliveryTime
+      };
+      
+      await createOrder(orderData);
+      clearCart();
+      navigate('/tracking');
+      showToast("Order placed successfully!", "success");
+    } catch (error) {
+      showToast("Failed to place order.", "error");
+    }
+  };
 
   if (cart.length === 0) {
     return (
@@ -642,7 +669,7 @@ const CartPage = ({ cart, updateQuantity, clearCart }: {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold">{item.name}</h3>
-              <p className="text-zinc-500 text-sm">${item.price}</p>
+              <p className="text-zinc-500 text-sm">{item.price} {language === 'ar' ? 'ر.ي' : 'YER'}</p>
             </div>
             <div className="flex items-center gap-3 bg-zinc-100 px-3 py-1.5 rounded-full">
               <button onClick={() => updateQuantity(item.id, -1)} className="hover:text-black text-zinc-500">
@@ -660,22 +687,33 @@ const CartPage = ({ cart, updateQuantity, clearCart }: {
       <div className="bg-zinc-50 p-6 rounded-3xl space-y-4">
         <div className="flex justify-between text-sm">
           <span className="text-zinc-500">Subtotal</span>
-          <span>${subtotal.toFixed(2)}</span>
+          <span>{subtotal.toFixed(2)} {language === 'ar' ? 'ر.ي' : 'YER'}</span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-zinc-500">Delivery Fee</span>
-          <span>${deliveryFee.toFixed(2)}</span>
+          <span>{deliveryFee.toFixed(2)} {language === 'ar' ? 'ر.ي' : 'YER'}</span>
         </div>
         <div className="h-px bg-zinc-200 my-2" />
         <div className="flex justify-between font-bold text-lg">
           <span>Total</span>
-          <span>${total.toFixed(2)}</span>
+          <span>{total.toFixed(2)} {language === 'ar' ? 'ر.ي' : 'YER'}</span>
         </div>
+
+        <div className="pt-4">
+          <label className="block text-sm font-medium text-zinc-500 mb-2">
+            {language === 'ar' ? 'وقت التوصيل المفضل' : 'Preferred Delivery Time'}
+          </label>
+          <input 
+            type="datetime-local" 
+            className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5"
+            value={new Date(deliveryTime).toISOString().slice(0, 16)}
+            onChange={e => setDeliveryTime(new Date(e.target.value).toISOString())}
+            required
+          />
+        </div>
+
         <button 
-          onClick={() => {
-            clearCart();
-            navigate('/tracking');
-          }}
+          onClick={handlePlaceOrder}
           className="w-full bg-black text-white py-4 rounded-2xl font-bold mt-4 hover:scale-[1.02] transition-transform"
         >
           Place Order
@@ -949,6 +987,7 @@ const LocationsPage = () => {
 };
 
 const DeliveryRoutesPage = () => {
+  const { language } = useLanguage();
   const [originSearch, setOriginSearch] = useState('');
   const [selectedOriginId, setSelectedOriginId] = useState<string | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<DeliveryRoute | null>(null);
@@ -1075,7 +1114,7 @@ const DeliveryRoutesPage = () => {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-500 text-sm">Delivery Price</span>
-                  <span className="text-2xl font-black">${selectedRoute.price.toFixed(2)}</span>
+                  <span className="text-2xl font-black">{selectedRoute.price.toFixed(2)} {language === 'ar' ? 'ر.ي' : 'YER'}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-500 text-sm">Status</span>
@@ -1647,6 +1686,8 @@ const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string, id: n
 
 const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete, onViewHistory }: { role: UserRole, orders: any[], onUpdateStatus: (id: number, status: string) => void, onEdit?: (order: any) => void, onDelete?: (id: number) => void, onViewHistory?: (id: number) => void }) => {
   const { t, language } = useLanguage();
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [localStatuses, setLocalStatuses] = useState<Record<number, string>>({});
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -1659,83 +1700,117 @@ const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete, onVie
     }
   };
 
+  const handleStatusChange = async (id: number, newStatus: string) => {
+    setUpdatingId(id);
+    setLocalStatuses(prev => ({ ...prev, [id]: newStatus }));
+    try {
+      await onUpdateStatus(id, newStatus);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   return (
     <div className="bg-white border border-zinc-100 rounded-3xl overflow-hidden shadow-sm">
-      <table className="w-full text-left">
-        <thead>
-          <tr className="bg-zinc-50 border-b border-zinc-100">
-            <th className="px-6 py-4 font-bold text-sm">{t.dashboard.orderId}</th>
-            <th className="px-6 py-4 font-bold text-sm">{language === 'ar' ? 'الوصف' : 'Description'}</th>
-            <th className="px-6 py-4 font-bold text-sm">{language === 'ar' ? 'المندوب' : 'Delivery'}</th>
-            <th className="px-6 py-4 font-bold text-sm">{t.dashboard.status}</th>
-            <th className="px-6 py-4 font-bold text-sm text-right">{language === 'ar' ? 'السعر' : 'Price'}</th>
-            <th className="px-6 py-4 font-bold text-sm text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-50">
-          {orders.map((order, index) => (
-            <tr key={order.id || order.Id || index} className="hover:bg-zinc-50/50 transition-colors">
-              <td className="px-6 py-4 text-sm font-bold">#ORD-{(order.id || order.Id)?.toString().padStart(4, '0') || '0000'}</td>
-              <td className="px-6 py-4 text-sm">
-                <div className="max-w-[200px] truncate" title={order.description || order.Description}>
-                  {order.description || order.Description}
-                </div>
-              </td>
-              <td className="px-6 py-4 text-sm text-zinc-500">{order.deliveryName || order.DeliveryName || '-'}</td>
-              <td className="px-6 py-4">
-                <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusColor(order.orderState || order.OrderState || order.status || order.Status)}`}>
-                    {(t.dashboard as any)[order.orderState || order.OrderState || order.status || order.Status] || order.orderState || order.OrderState || order.status || order.Status}
-                  </span>
-                  <select 
-                    className="text-[10px] font-bold bg-zinc-50 border border-zinc-100 rounded-lg px-2 py-1 focus:outline-none"
-                    value={order.orderState || order.OrderState || order.status || order.Status || 'pending'}
-                    onChange={(e) => onUpdateStatus(order.id || order.Id, e.target.value)}
-                  >
-                    <option value="pending">{t.dashboard.pending}</option>
-                    <option value="preparing">{t.dashboard.preparing}</option>
-                    <option value="onTheWay">{t.dashboard.onTheWay}</option>
-                    <option value="delivered">{t.dashboard.delivered}</option>
-                    <option value="cancelled">{t.dashboard.cancelled}</option>
-                  </select>
-                </div>
-              </td>
-              <td className="px-6 py-4 text-sm font-bold text-right">${(order.deliveryPrice || order.DeliveryPrice || 0).toFixed(2)}</td>
-              <td className="px-6 py-4 text-right">
-                <div className="flex justify-end gap-2">
-                  {onViewHistory && (
-                    <button 
-                      onClick={() => onViewHistory(order.id || order.Id)}
-                      className="p-2 text-zinc-400 hover:text-primary transition-colors"
-                      title={language === 'ar' ? 'السجل' : 'History'}
-                    >
-                      <History className="w-4 h-4" />
-                    </button>
-                  )}
-                  {onEdit && (
-                    <button 
-                      onClick={() => onEdit(order)}
-                      className="p-2 text-zinc-400 hover:text-black transition-colors"
-                      title={t.common.edit}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                  )}
-                  {onDelete && (
-                    <button 
-                      onClick={() => onDelete(order.id || order.Id)}
-                      className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
-                      title={t.common.delete}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </td>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="bg-zinc-50 border-b border-zinc-100">
+              <th className="px-6 py-4 font-bold text-sm">{t.dashboard.orderId}</th>
+              <th className="px-6 py-4 font-bold text-sm">{language === 'ar' ? 'الوصف' : 'Description'}</th>
+              <th className="px-6 py-4 font-bold text-sm">{language === 'ar' ? 'المندوب' : 'Delivery'}</th>
+              <th className="px-6 py-4 font-bold text-sm">{t.dashboard.status}</th>
+              <th className="px-6 py-4 font-bold text-sm text-right">{language === 'ar' ? 'السعر' : 'Price'}</th>
+              <th className="px-6 py-4 font-bold text-sm text-right">Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-zinc-50">
+            {orders.map((order, index) => {
+              const orderId = order.id || order.Id;
+              const currentStatus = localStatuses[orderId] || order.orderState || order.OrderState || order.status || order.Status || 'pending';
+              const isUpdating = updatingId === orderId;
+
+              return (
+                <tr key={orderId || index} className="hover:bg-zinc-50/50 transition-colors">
+                  <td className="px-6 py-4 text-sm font-bold">
+                    <div>#ORD-{orderId?.toString().padStart(4, '0') || '0000'}</div>
+                    {order.deliveryTime && (
+                      <div className="text-[10px] text-zinc-400 font-normal flex items-center gap-1 mt-1">
+                        <Clock className="w-3 h-3" />
+                        {new Date(order.deliveryTime).toLocaleString(language === 'ar' ? 'ar-YE' : 'en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    <div className="max-w-[200px] truncate" title={order.description || order.Description}>
+                      {order.description || order.Description}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-zinc-500">{order.deliveryName || order.DeliveryName || '-'}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusColor(currentStatus)} ${isUpdating ? 'opacity-50 animate-pulse' : ''}`}>
+                        {(t.dashboard as any)[currentStatus] || currentStatus}
+                      </span>
+                      {role !== 'customer' && (
+                        <select 
+                          className="text-[10px] font-bold bg-zinc-50 border border-zinc-100 rounded-lg px-2 py-1 focus:outline-none disabled:opacity-50"
+                          value={currentStatus}
+                          onChange={(e) => handleStatusChange(orderId, e.target.value)}
+                          disabled={isUpdating}
+                        >
+                          <option value="pending">{t.dashboard.pending}</option>
+                          <option value="preparing">{t.dashboard.preparing}</option>
+                          <option value="onTheWay">{t.dashboard.onTheWay}</option>
+                          <option value="delivered">{t.dashboard.delivered}</option>
+                          <option value="cancelled">{t.dashboard.cancelled}</option>
+                        </select>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-bold text-right">{(order.deliveryPrice || order.DeliveryPrice || 0).toFixed(2)} {language === 'ar' ? 'ر.ي' : 'YER'}</td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-2">
+                      {onViewHistory && (
+                        <button 
+                          onClick={() => onViewHistory(orderId)}
+                          className="p-2 text-zinc-400 hover:text-primary transition-colors"
+                          title={language === 'ar' ? 'السجل' : 'History'}
+                        >
+                          <History className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onEdit && (
+                        <button 
+                          onClick={() => onEdit(order)}
+                          className="p-2 text-zinc-400 hover:text-black transition-colors"
+                          title={t.common.edit}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button 
+                          onClick={() => onDelete(orderId)}
+                          className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+                          title={t.common.delete}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       {orders.length === 0 && (
         <div className="p-12 text-center">
           <p className="text-zinc-400 font-medium">No orders found.</p>
@@ -1912,7 +1987,8 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
     deliveryLocationDescription: '',
     orderState: 'pending',
     receptionDescription: '',
-    deliveryName: ''
+    deliveryName: '',
+    deliveryTime: new Date().toISOString()
   });
   const [locationForm, setLocationForm] = useState({ name: '', address: '', image: '', googleMapsUrl: '' });
   const [userForm, setUserForm] = useState({ 
@@ -1977,7 +2053,8 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
         deliveryLocationDescription: '',
         orderState: 'pending',
         receptionDescription: '',
-        deliveryName: ''
+        deliveryName: '',
+        deliveryTime: new Date().toISOString()
       });
     } catch (error) {
       showToast("Failed to save order.", "error");
@@ -2003,7 +2080,8 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
       deliveryLocationDescription: '',
       orderState: 'pending',
       receptionDescription: '',
-      deliveryName: ''
+      deliveryName: '',
+      deliveryTime: new Date().toISOString()
     });
     setShowOrderModal(true);
   };
@@ -2016,7 +2094,8 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
       deliveryLocationDescription: order.deliveryLocationDescription || '',
       orderState: order.orderState || 'pending',
       receptionDescription: order.receptionDescription || '',
-      deliveryName: order.deliveryName || ''
+      deliveryName: order.deliveryName || '',
+      deliveryTime: order.deliveryTime || new Date().toISOString()
     });
     setShowOrderModal(true);
   };
@@ -2284,7 +2363,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
               <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
                 <p className="text-zinc-500 text-sm mb-1">{t.dashboard.totalIncome}</p>
                 <p className="text-4xl font-black text-emerald-500">
-                  ${orders.reduce((sum: number, order: any) => sum + (order.deliveryPrice || 0), 0).toFixed(2)}
+                  {orders.reduce((sum: number, order: any) => sum + (order.deliveryPrice || 0), 0).toFixed(2)} {language === 'ar' ? 'ر.ي' : 'YER'}
                 </p>
               </div>
               <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
@@ -2984,7 +3063,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                       <tr key={route.id} className="hover:bg-zinc-50/50 transition-colors">
                         <td className="px-6 py-4 text-sm font-medium">{route.destination}</td>
                         <td className="px-6 py-4 text-sm text-zinc-500">{route.distance}</td>
-                        <td className="px-6 py-4 text-sm font-bold">${route.price.toFixed(2)}</td>
+                        <td className="px-6 py-4 text-sm font-bold">{route.price.toFixed(2)} {language === 'ar' ? 'ر.ي' : 'YER'}</td>
                         <td className="px-6 py-4 text-right">
                           <button onClick={() => handleDeleteRoute(route.id)} className="p-2 text-zinc-400 hover:text-red-500 transition-colors">
                             <Trash2 className="w-4 h-4" />
@@ -3148,6 +3227,16 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                       onChange={e => setOrderForm({ ...orderForm, receptionDescription: e.target.value })}
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-500 mb-1">{language === 'ar' ? 'وقت التوصيل' : 'Delivery Time'}</label>
+                    <input 
+                      type="datetime-local" 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
+                      value={orderForm.deliveryTime ? new Date(orderForm.deliveryTime).toISOString().slice(0, 16) : ''}
+                      onChange={e => setOrderForm({ ...orderForm, deliveryTime: new Date(e.target.value).toISOString() })}
+                      required
+                    />
+                  </div>
 
                   <div className="flex gap-4 pt-4">
                     <button 
@@ -3295,7 +3384,7 @@ const RestaurantOwnerDashboard = ({ userId }: { userId: number | null }) => {
     {
       id: 1,
       name: 'Classic Cheeseburger',
-      price: 12.99,
+      price: 2500, // Updated from 12.99 to 2500 YER
       description: 'Juicy beef patty with cheddar cheese, lettuce, and tomato.',
       isAvailable: true,
       baseImage: 'https://picsum.photos/seed/burger1/400',
@@ -3307,8 +3396,8 @@ const RestaurantOwnerDashboard = ({ userId }: { userId: number | null }) => {
   ]);
 
   const [orders, setOrders] = useState<any[]>([
-    { id: 2001, description: 'Order from John Doe', deliveryName: 'Mandoob 1', orderState: 'preparing', deliveryPrice: 45.00 },
-    { id: 2002, description: 'Order from Jane Smith', deliveryName: 'Mandoob 2', orderState: 'pending', deliveryPrice: 28.50 },
+    { id: 2001, description: 'Order from John Doe', deliveryName: 'Mandoob 1', orderState: 'preparing', deliveryPrice: 1500, deliveryTime: new Date().toISOString() },
+    { id: 2002, description: 'Order from Jane Smith', deliveryName: 'Mandoob 2', orderState: 'pending', deliveryPrice: 1200, deliveryTime: new Date().toISOString() },
   ]);
 
   const handleUpdateOrderStatus = (id: number, status: string) => {
@@ -3533,7 +3622,7 @@ const RestaurantOwnerDashboard = ({ userId }: { userId: number | null }) => {
                     <div className="p-6">
                       <div className="flex justify-between items-start mb-2">
                         <h3 className="font-bold text-lg">{meal.name}</h3>
-                        <span className="font-black text-primary">${meal.price.toFixed(2)}</span>
+                        <span className="font-black text-primary">{meal.price.toFixed(2)} {language === 'ar' ? 'ر.ي' : 'YER'}</span>
                       </div>
                       <p className="text-zinc-500 text-sm mb-4 line-clamp-2">{meal.description}</p>
                       <div className="flex flex-wrap gap-2 mb-2">
@@ -3714,8 +3803,8 @@ const DeliveryDashboard = ({ userId }: { userId: number | null }) => {
   const { t, language } = useLanguage();
   const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'profile'>('overview');
   const [orders, setOrders] = useState<any[]>([
-    { id: 3001, description: 'Order for Mike Ross', deliveryName: 'Self', orderState: 'onTheWay', deliveryPrice: 15.00 },
-    { id: 3002, description: 'Order for Harvey Specter', deliveryName: 'Self', orderState: 'preparing', deliveryPrice: 85.00 },
+    { id: 3001, description: 'Order for Mike Ross', deliveryName: 'Self', orderState: 'onTheWay', deliveryPrice: 1000 },
+    { id: 3002, description: 'Order for Harvey Specter', deliveryName: 'Self', orderState: 'preparing', deliveryPrice: 1500 },
   ]);
 
   const handleUpdateOrderStatus = (id: number, status: string) => {
@@ -3757,7 +3846,7 @@ const DeliveryDashboard = ({ userId }: { userId: number | null }) => {
               <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
                 <h3 className="font-bold mb-2">{t.dashboard.totalIncome}</h3>
                 <p className="text-3xl font-black text-primary">
-                  ${orders.reduce((sum: number, o: any) => sum + (o.deliveryPrice || 0), 0).toFixed(2)}
+                  {orders.reduce((sum: number, o: any) => sum + (o.deliveryPrice || 0), 0).toFixed(2)} {language === 'ar' ? 'ر.ي' : 'YER'}
                 </p>
               </div>
               <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm">
