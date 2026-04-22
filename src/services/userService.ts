@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import apiClient from "./apiClient";
 import { User, CreateUserRequest } from "../types";
 
-export const fetchUsers = async (pageNumber = 1, pageSize = 10): Promise<User[]> => {
+export const fetchUsers = async (page = 1, pageSize = 10, sort = 'asc'): Promise<User[]> => {
   const response = await apiClient.get(`Users`, {
-    params: { pageNumber, pageSize }
+    params: { page, pageSize, sort }
   });
   if (Array.isArray(response)) return response;
   if (response && typeof response === 'object' && Array.isArray((response as any).data)) return (response as any).data;
@@ -16,10 +16,10 @@ export const fetchUserById = async (id: number): Promise<User> => {
   return apiClient.get(`Users/${id}`);
 };
 
-export function useUsers(pageNumber = 1, pageSize = 100) {
+export function useUsers(page = 1, pageSize = 100, sort = 'asc') {
   return useQuery<User[]>({
-    queryKey: ["users", pageNumber, pageSize],
-    queryFn: () => fetchUsers(pageNumber, pageSize),
+    queryKey: ["users", page, pageSize, sort],
+    queryFn: () => fetchUsers(page, pageSize, sort),
     staleTime: 1000 * 60 * 5,
   });
 }

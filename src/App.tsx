@@ -632,7 +632,7 @@ const CartPage = ({ cart, updateQuantity, clearCart }: {
         deliveryLocationDescription: 'Customer Address',
         orderState: 'pending',
         receptionDescription: 'Standard Delivery',
-        deliveryName: 'Pending Assignment',
+        deliveryUserId: 0,
         deliveryTime: deliveryTime
       };
       
@@ -1687,7 +1687,7 @@ const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string, id: n
   );
 };
 
-const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete, onViewHistory }: { role: UserRole, orders: any[], onUpdateStatus: (id: number, status: string) => void, onEdit?: (order: any) => void, onDelete?: (id: number) => void, onViewHistory?: (id: number) => void }) => {
+const OrderManagement = ({ role, orders, users = [], onUpdateStatus, onEdit, onDelete, onViewHistory }: { role: UserRole, orders: any[], users?: any[], onUpdateStatus: (id: number, status: string) => void, onEdit?: (order: any) => void, onDelete?: (id: number) => void, onViewHistory?: (id: number) => void }) => {
   const { t, language } = useLanguage();
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [localStatuses, setLocalStatuses] = useState<Record<number, string>>({});
@@ -1792,7 +1792,17 @@ const OrderManagement = ({ role, orders, onUpdateStatus, onEdit, onDelete, onVie
                       {order.description || order.Description}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-zinc-500">{order.deliveryName || order.DeliveryName || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-zinc-500">
+                    {(() => {
+                      if (order.deliveryName || order.DeliveryName) return order.deliveryName || order.DeliveryName;
+                      const dId = order.deliveryUserId || order.DeliveryUserId;
+                      if (dId && dId !== 0) {
+                        const user = users.find((u: any) => u.id === dId);
+                        return user ? (user.fullName || user.name) : `ID: ${dId}`;
+                      }
+                      return '-';
+                    })()}
+                  </td>
                   <td className="px-6 py-4 text-sm">
                     <div className="flex items-center gap-1.5 text-zinc-500">
                       <Calendar className="w-3 h-3" />
@@ -2058,7 +2068,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
     deliveryLocationDescription: '',
     orderState: 'pending',
     receptionDescription: '',
-    deliveryName: '',
+    deliveryUserId: 0,
     deliveryTime: new Date().toISOString()
   });
   const [locationForm, setLocationForm] = useState({ name: '', address: '', image: '', googleMapsUrl: '' });
@@ -2097,10 +2107,24 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
 
   const handleUpdateOrderStatus = async (id: number, status: string) => {
     try {
-      await updateOrderState(id, status);
+      const order = orders.find((o: any) => (o.id || o.Id) === id);
+      if (!order) return;
+
+      const updatePayload: CreateOrderRequest = {
+        deliveryPrice: order.deliveryPrice ?? order.DeliveryPrice ?? 0,
+        description: order.description ?? order.Description ?? '',
+        deliveryLocationDescription: order.deliveryLocationDescription ?? order.DeliveryLocationDescription ?? '',
+        orderState: status,
+        receptionDescription: order.receptionDescription ?? order.ReceptionDescription ?? '',
+        deliveryUserId: order.deliveryUserId ?? order.DeliveryUserId ?? 0,
+        deliveryTime: order.deliveryTime ?? order.DeliveryTime ?? new Date().toISOString()
+      };
+
+      await updateOrder(id, updatePayload);
       refetchOrders();
       showToast("Order status updated!", "success");
     } catch (error) {
+      console.error("Error updating order status:", error);
       showToast("Failed to update order status.", "error");
     }
   };
@@ -2124,7 +2148,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
         deliveryLocationDescription: '',
         orderState: 'pending',
         receptionDescription: '',
-        deliveryName: '',
+        deliveryUserId: 0,
         deliveryTime: new Date().toISOString()
       });
     } catch (error) {
@@ -2151,7 +2175,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
       deliveryLocationDescription: '',
       orderState: 'pending',
       receptionDescription: '',
-      deliveryName: '',
+      deliveryUserId: 0,
       deliveryTime: new Date().toISOString()
     });
     setShowOrderModal(true);
@@ -2160,13 +2184,13 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
   const openEditOrder = (order: any) => {
     setEditingOrder(order);
     setOrderForm({
-      deliveryPrice: order.deliveryPrice || 0,
-      description: order.description || '',
-      deliveryLocationDescription: order.deliveryLocationDescription || '',
-      orderState: order.orderState || 'pending',
-      receptionDescription: order.receptionDescription || '',
-      deliveryName: order.deliveryName || '',
-      deliveryTime: order.deliveryTime || new Date().toISOString()
+      deliveryPrice: order.deliveryPrice ?? order.DeliveryPrice ?? 0,
+      description: order.description ?? order.Description ?? '',
+      deliveryLocationDescription: order.deliveryLocationDescription ?? order.DeliveryLocationDescription ?? '',
+      orderState: order.orderState ?? order.OrderState ?? 'pending',
+      receptionDescription: order.receptionDescription ?? order.ReceptionDescription ?? '',
+      deliveryUserId: order.deliveryUserId ?? order.DeliveryUserId ?? 0,
+      deliveryTime: order.deliveryTime ?? order.DeliveryTime ?? new Date().toISOString()
     });
     setShowOrderModal(true);
   };
@@ -3190,6 +3214,7 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
             <OrderManagement 
               role="admin" 
               orders={orders} 
+              users={users}
               onUpdateStatus={handleUpdateOrderStatus} 
               onEdit={openEditOrder}
               onDelete={handleDeleteOrder}
@@ -3272,13 +3297,18 @@ const AdminDashboard = ({ locations, routes, selectedOriginId, setSelectedOrigin
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-zinc-500 mb-1">{language === 'ar' ? 'اسم المندوب' : 'Delivery Name'}</label>
-                    <input 
-                      type="text" 
+                    <label className="block text-sm font-medium text-zinc-500 mb-1">{language === 'ar' ? 'المندوب' : 'Delivery User'}</label>
+                    <select 
                       className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none"
-                      value={orderForm.deliveryName}
-                      onChange={e => setOrderForm({ ...orderForm, deliveryName: e.target.value })}
-                    />
+                      value={orderForm.deliveryUserId}
+                      onChange={e => setOrderForm({ ...orderForm, deliveryUserId: parseInt(e.target.value) })}
+                      required
+                    >
+                      <option value="0">{language === 'ar' ? 'اختر المندوب' : 'Select Delivery User'}</option>
+                      {users.filter((u: any) => (u.role === 'delivery' || (u.roles && u.roles[0] === 'delivery'))).map((u: any) => (
+                        <option key={u.id} value={u.id}>{u.fullName || u.name} (@{u.username || u.email.split('@')[0]})</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-500 mb-1">{language === 'ar' ? 'وصف موقع التوصيل' : 'Delivery Location Description'}</label>

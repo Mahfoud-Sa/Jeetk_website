@@ -51,15 +51,27 @@ export interface DeliveryRoute {
 
 export interface Order {
   id: number;
+  Id?: number;
   deliveryPrice: number;
+  DeliveryPrice?: number;
   description: string;
+  Description?: string;
   deliveryLocationDescription: string;
+  DeliveryLocationDescription?: string;
   orderState: string;
+  OrderState?: string;
   receptionDescription: string;
+  ReceptionDescription?: string;
   deliveryName: string;
+  DeliveryName?: string;
+  deliveryUserId?: number;
+  DeliveryUserId?: number;
   deliveryTime?: string;
+  DeliveryTime?: string;
   createdAt?: string;
+  CreatedAt?: string;
   updatedAt?: string;
+  UpdatedAt?: string;
 }
 
 export type ActionType = 'Create' | 'Update' | 'Delete';
@@ -82,7 +94,7 @@ export interface CreateOrderRequest {
   deliveryLocationDescription: string;
   orderState: string;
   receptionDescription: string;
-  deliveryName: string;
+  deliveryUserId: number;
   deliveryTime: string;
 }
 
