@@ -1,8 +1,8 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { User, PhoneNumber } from '../types';
 import { useUser, updateUser } from '../services/userService';
-import { useLanguage } from '../App';
-import { useToast } from '../App';
+import { useLanguage } from '../context/LanguageContext';
+import { useToast } from '../context/ToastContext';
 import { 
   User as UserIcon, 
   Mail, 

@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import apiClient from "./apiClient";
 import { Order, CreateOrderRequest, ActionEntity } from "../types";
 
-export const fetchOrders = async (pageNumber = 1, pageSize = 100): Promise<Order[]> => {
+export const fetchOrders = async (page = 1, pageSize = 100): Promise<Order[]> => {
   const response = await apiClient.get(`Orders`, {
-    params: { pageNumber, pageSize }
+    params: { page, pageSize }
   });
   if (Array.isArray(response)) return response;
   if (response && typeof response === 'object' && Array.isArray((response as any).data)) return (response as any).data;
@@ -31,10 +31,10 @@ export const fetchOrderHistory = async (id: number): Promise<ActionEntity[]> => 
   return [];
 };
 
-export function useOrders(pageNumber = 1, pageSize = 100) {
+export function useOrders(page = 1, pageSize = 100, userId?: number | null) {
   return useQuery<Order[]>({
-    queryKey: ["orders", pageNumber, pageSize],
-    queryFn: () => fetchOrders(pageNumber, pageSize),
+    queryKey: ["orders", page, pageSize, userId],
+    queryFn: () => fetchOrders(page, pageSize),
     staleTime: 1000 * 60 * 5,
   });
 }
