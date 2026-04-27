@@ -3,11 +3,13 @@ import { MapPin, Globe, Search, ShoppingBag, LogIn, LayoutDashboard } from 'luci
 import { useLanguage } from '../context/LanguageContext';
 import { JeetkLogo } from './JeetkLogo';
 
-export const Navbar = ({ cartCount, isAuthenticated }: { 
-  cartCount: number, 
-  isAuthenticated: boolean
+import { useAuth } from '../context/AuthContext';
+
+export const Navbar = ({ cartCount }: { 
+  cartCount: number
 }) => {
   const { language, setLanguage, t } = useLanguage();
+  const { isAuthenticated } = useAuth();
   
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-black/5">

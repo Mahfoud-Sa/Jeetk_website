@@ -1,13 +1,13 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Lock, LogIn, Eye, EyeOff } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { login, setToken } from '../services/authService';
-import { UserRole } from '../types';
+import { useAuth } from '../context/AuthContext';
 
-export const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string, id: number, token?: string) => void }) => {
+export const LoginPage = () => {
   const { t, language } = useLanguage();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -20,34 +20,7 @@ export const LoginPage = ({ onLogin }: { onLogin: (role: UserRole, email: string
     setIsLoading(true);
     
     try {
-      const response = await login({ email, password });
-      
-      if (response && response.token) {
-        setToken(response.token);
-      }
-      
-      if (!response.roles || response.roles.length === 0) {
-        setError(language === 'ar' 
-          ? 'لا توجد أدوار لهذا المستخدم، يرجى التواصل مع المسؤول لمنحك الصلاحيات.' 
-          : 'There are no roles with this user, contact admin to give you.');
-        return;
-      }
-      
-      const userRolesStrings = response.roles.map((r: any) => 
-        (typeof r === 'string' ? r : r?.name || r?.role || '').toLowerCase()
-      );
-      
-      let finalRole: UserRole = 'customer';
-      
-      if (userRolesStrings.includes('admin')) {
-        finalRole = 'admin';
-      } else if (userRolesStrings.includes('delivery')) {
-        finalRole = 'delivery';
-      } else if (userRolesStrings.includes('customer')) {
-        finalRole = 'customer';
-      }
-      
-      onLogin(finalRole, email, response.id, response.token);
+      await login({ email, password });
     } catch (err: any) {
       console.error("Login error:", err);
       const errorMsg = err.response?.data?.message || err.message || (language === 'ar' ? 'فشل تسجيل الدخول.' : 'Login failed.');

@@ -1,33 +1,16 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { useToast } from '../context/ToastContext';
-import { UserRole } from '../types';
+import { useAuth } from '../context/AuthContext';
 import { AdminDashboard } from '../components/dashboard/AdminDashboard';
 import { RestaurantOwnerDashboard } from '../components/dashboard/RestaurantOwnerDashboard';
 import { DeliveryDashboard } from '../components/dashboard/DeliveryDashboard';
-import { useQueryClient } from '@tanstack/react-query';
 
-export const DashboardPage = ({ onLogout, userId, isAuthenticated }: { onLogout: () => void, userId: number | null, isAuthenticated: boolean }) => {
+export const DashboardPage = () => {
   const { t } = useLanguage();
-  const navigate = useNavigate();
-  const [role, setRole] = useState<UserRole | null>(null);
-  const queryClient = useQueryClient();
+  const { user, role, logout } = useAuth();
   
-  useEffect(() => {
-    const savedRole = localStorage.getItem('jeetk_user_role') as UserRole;
-    if (!isAuthenticated) {
-      navigate('/login');
-    } else {
-      setRole(savedRole);
-    }
-  }, [navigate, isAuthenticated]);
-
   const handleSignOut = () => {
-    onLogout();
-    queryClient.clear();
-    navigate('/login');
+    logout();
   };
 
   return (
@@ -51,11 +34,11 @@ export const DashboardPage = ({ onLogout, userId, isAuthenticated }: { onLogout:
       </div>
 
       {role === 'admin' ? (
-        <AdminDashboard userId={userId} />
+        <AdminDashboard userId={user?.id || null} />
       ) : role === 'customer' ? (
-        <RestaurantOwnerDashboard userId={userId} />
+        <RestaurantOwnerDashboard userId={user?.id || null} />
       ) : role === 'delivery' ? (
-        <DeliveryDashboard userId={userId} />
+        <DeliveryDashboard userId={user?.id || null} />
       ) : (
         <div className="p-8 bg-white border border-zinc-100 rounded-3xl shadow-sm text-center">
           <h2 className="text-xl font-bold text-zinc-400">Dashboard for {role} is coming soon...</h2>

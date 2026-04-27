@@ -39,14 +39,32 @@ apiClient.interceptors.request.use(
 
 // Add interceptor to return data directly as expected by the service functions
 let errorCallback: ((message: string) => void) | null = null;
+let unauthorizedCallback: (() => void) | null = null;
 
 export const setGlobalErrorHandler = (callback: (message: string) => void) => {
   errorCallback = callback;
 };
 
+export const setUnauthorizedHandler = (callback: () => void) => {
+  unauthorizedCallback = callback;
+};
+
 apiClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    if (error.response?.status === 401) {
+      if (unauthorizedCallback) {
+        unauthorizedCallback();
+      } else {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        // Fallback: reload page to clear state if no callback registered
+        if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+          window.location.href = "/login";
+        }
+      }
+    }
+
     const message = error.response?.data?.message || error.message || "An unexpected error occurred";
     if (errorCallback) {
       errorCallback(message);
