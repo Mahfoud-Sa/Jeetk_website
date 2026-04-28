@@ -25,6 +25,7 @@ import { LocationsPage } from './pages/LocationsPage';
 import { DeliveryRoutesPage } from './pages/DeliveryRoutesPage';
 import { DeliveryRegistrationPage } from './pages/DeliveryRegistrationPage';
 import { LoginPage } from './pages/LoginPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
 
 function AppContent() {
@@ -99,6 +100,11 @@ function AppContent() {
             <Route path="/login" element={
               <PublicRoute>
                 <LoginPage />
+              </PublicRoute>
+            } />
+            <Route path="/forgot-password" element={
+              <PublicRoute>
+                <ForgotPasswordPage />
               </PublicRoute>
             } />
             

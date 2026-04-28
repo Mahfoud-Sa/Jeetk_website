@@ -61,12 +61,12 @@ export const LoginPage = () => {
           <div>
             <div className="flex justify-between items-center mb-1.5 ml-1">
               <label className="block text-sm font-bold">{language === 'ar' ? 'كلمة المرور' : 'Password'}</label>
-              <button 
-                type="button"
+              <Link 
+                to="/forgot-password"
                 className="text-xs font-bold text-primary hover:underline"
               >
-                {language === 'ar' ? 'نسيت كلمة المرور؟' : 'Forgot Password?'}
-              </button>
+                {t.auth.forgotPassword}
+              </Link>
             </div>
             <div className="relative">
               <input 

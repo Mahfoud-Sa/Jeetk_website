@@ -119,6 +119,22 @@ export const translations = {
       delete: 'Delete',
       edit: 'Edit',
       loading: 'Loading...',
+    },
+    auth: {
+      forgotPassword: 'Forgot Password?',
+      sendOtp: 'Send OTP',
+      resetPassword: 'Reset Password',
+      otpSent: 'OTP has been sent to your email',
+      enterOtp: 'Enter OTP',
+      newPassword: 'New Password',
+      confirmPassword: 'Confirm Password',
+      passwordsDoNotMatch: 'Passwords do not match',
+      backToLogin: 'Back to Login',
+      emailPlaceholder: 'Enter your email',
+      otpPlaceholder: 'Enter code',
+      passwordSuccess: 'Password has been reset successfully',
+      passwordError: 'Failed to reset password. Please check your OTP.',
+      emailNotfound: 'Email not found',
     }
   },
   ar: {
@@ -241,6 +257,22 @@ export const translations = {
       delete: 'حذف',
       edit: 'تعديل',
       loading: 'جاري التحميل...',
+    },
+    auth: {
+      forgotPassword: 'نسيت كلمة المرور؟',
+      sendOtp: 'إرسال رمز التحقق',
+      resetPassword: 'إعادة تعيين كلمة المرور',
+      otpSent: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني',
+      enterOtp: 'أدخل رمز التحقق',
+      newPassword: 'كلمة المرور الجديدة',
+      confirmPassword: 'تأكيد كلمة المرور',
+      passwordsDoNotMatch: 'كلمات المرور غير متطابقة',
+      backToLogin: 'العودة لتسجيل الدخول',
+      emailPlaceholder: 'أدخل بريدك الإلكتروني',
+      otpPlaceholder: 'أدخل الرمز',
+      passwordSuccess: 'تم إعادة تعيين كلمة المرور بنجاح',
+      passwordError: 'فشل إعادة تعيين كلمة المرور. يرجى التحقق من الرمز.',
+      emailNotfound: 'البريد الإلكتروني غير موجود',
     }
   }
 };

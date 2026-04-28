@@ -39,6 +39,14 @@ export const login = async (credentials: LoginRequest): Promise<LoginResponse> =
   return apiClient.post("Auth/login", credentials);
 };
 
+export const forgotPassword = async (email: string): Promise<any> => {
+  return apiClient.post("Auth/forgot-password", { email });
+};
+
+export const resetPassword = async (email: string, token: string, newPassword: string): Promise<any> => {
+  return apiClient.post("Auth/reset-password", { email, token, newPassword });
+};
+
 export const assignRole = async (userId: number, roleId: number): Promise<any> => {
   return apiClient.post("Auth/roles/assign", { userId, roleId });
 };
