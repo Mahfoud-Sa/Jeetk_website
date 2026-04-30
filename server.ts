@@ -11,15 +11,23 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Logging middleware
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+  });
+
   // Proxy API requests to the real backend
   app.use(
     createProxyMiddleware({
+      pathFilter: "/api",
       target: "https://jeetk-api.runasp.net",
       changeOrigin: true,
-      pathFilter: "/api",
       on: {
         proxyReq: (proxyReq, req, res) => {
-          console.log(`[Proxy] Request: ${req.method} ${req.url} -> ${proxyReq.host}${proxyReq.path}`);
+          console.log(
+            `[Proxy] Request: ${req.method} ${req.url} -> ${proxyReq.host}${proxyReq.path}`
+          );
         },
         proxyRes: (proxyRes, req, res) => {
           console.log(`[Proxy] Response: ${proxyRes.statusCode} from ${req.url}`);
