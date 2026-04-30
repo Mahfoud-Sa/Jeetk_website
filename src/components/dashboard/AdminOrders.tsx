@@ -97,7 +97,7 @@ export const AdminOrders = ({ userId }: { userId: number | null }) => {
           className="bg-black text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:scale-[1.02] transition-transform shadow-sm"
         >
           <Plus className="w-5 h-5" />
-          {t.cart.checkout}
+          {t.common.checkout}
         </button>
       </div>
 
