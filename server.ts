@@ -19,10 +19,13 @@ async function startServer() {
 
   // Proxy API requests to the real backend
   app.use(
+    "/api",
     createProxyMiddleware({
-      pathFilter: "/api",
-      target: "https://jeetk-api.runasp.net",
+      target: "https://jeetk-api.runasp.net/api",
       changeOrigin: true,
+      pathRewrite: {
+        "^/api": "",
+      },
       on: {
         proxyReq: (proxyReq, req, res) => {
           console.log(
