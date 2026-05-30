@@ -26,6 +26,7 @@ import { DeliveryRoutesPage } from './pages/DeliveryRoutesPage';
 import { DeliveryRegistrationPage } from './pages/DeliveryRegistrationPage';
 import { LoginPage } from './pages/LoginPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { DashboardPage } from './pages/DashboardPage';
 
 function AppContent() {
@@ -106,6 +107,9 @@ function AppContent() {
               <PublicRoute>
                 <ForgotPasswordPage />
               </PublicRoute>
+            } />
+            <Route path="/verify-email" element={
+              <VerifyEmailPage />
             } />
             
             <Route path="/dashboard" element={

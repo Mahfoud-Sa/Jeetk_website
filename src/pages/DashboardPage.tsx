@@ -1,4 +1,5 @@
-import { LogOut } from 'lucide-react';
+import { LogOut, ShieldAlert, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { AdminDashboard } from '../components/dashboard/AdminDashboard';
@@ -6,7 +7,7 @@ import { RestaurantOwnerDashboard } from '../components/dashboard/RestaurantOwne
 import { DeliveryDashboard } from '../components/dashboard/DeliveryDashboard';
 
 export const DashboardPage = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user, role, logout } = useAuth();
   
   const handleSignOut = () => {
@@ -32,6 +33,33 @@ export const DashboardPage = () => {
           <LogOut className="w-4 h-4" /> {t.dashboard.signOut}
         </button>
       </div>
+
+      {user && !user.isEmailVerified && (
+        <div className="mb-8 p-6 bg-amber-50 border border-amber-100 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-amber-100 border border-amber-200 rounded-2xl flex items-center justify-center shrink-0">
+              <ShieldAlert className="w-6 h-6 text-amber-600 animate-pulse" />
+            </div>
+            <div className="text-start">
+              <h3 className="font-bold text-amber-900">
+                {language === 'ar' ? 'البريد الإلكتروني غير مؤكد!' : 'Email Address Not Verified!'}
+              </h3>
+              <p className="text-sm text-amber-700/90 mt-0.5">
+                {language === 'ar' 
+                  ? 'يرجى تأكيد بريدك الإلكتروني لتنشيط حسابك بالكامل وتلقي تحديثات حالة الطلب.'
+                  : 'Please verify your email address to fully activate your account and receive order status updates.'}
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/verify-email"
+            className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl text-sm font-bold flex items-center gap-2 transition-colors whitespace-nowrap shadow-sm shadow-amber-600/15"
+          >
+            {language === 'ar' ? 'تأكيد البريد الآن' : 'Verify Email Now'}
+            <ArrowRight className={`w-4 h-4 ${language === 'ar' ? 'rotate-180' : ''}`} />
+          </Link>
+        </div>
+      )}
 
       {role === 'admin' ? (
         <AdminDashboard userId={user?.id || null} />

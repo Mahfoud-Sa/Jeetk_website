@@ -14,6 +14,7 @@ export interface LoginResponse {
   email: string;
   username: string;
   isActive: boolean;
+  isEmailVerified?: boolean;
   roles: (string | any)[];
 }
 
@@ -62,4 +63,16 @@ export const setToken = (token: string) => {
 
 export const getToken = () => {
   return localStorage.getItem("token");
+};
+
+export const verifyEmail = async (email: string, code: string): Promise<any> => {
+  return apiClient.post("Auth/verify-email", { email, code });
+};
+
+export const sendEmailCode = async (email: string): Promise<any> => {
+  return apiClient.post("Auth/send-email", JSON.stringify(email), {
+    headers: {
+      "Content-Type": "application/json",
+    }
+  });
 };

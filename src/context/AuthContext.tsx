@@ -9,6 +9,7 @@ interface AuthUser {
   email: string;
   username: string;
   roles: string[];
+  isEmailVerified?: boolean;
 }
 
 interface AuthContextType {
@@ -19,6 +20,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
   logout: () => void;
+  updateVerificationStatus: (verified: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,6 +64,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         (typeof r === "string" ? r : r?.name || r?.role || "").toLowerCase()
       );
       
+      // Prevent delivery users who have not verified their email from logging in
+      if (userRolesStrings.includes("delivery") && response.isEmailVerified === false) {
+        throw new Error("delivery_unverified:" + response.email);
+      }
+      
       let finalRole: UserRole = "customer";
       if (userRolesStrings.includes("admin")) finalRole = "admin";
       else if (userRolesStrings.includes("delivery")) finalRole = "delivery";
@@ -72,6 +79,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email: response.email,
         username: response.username,
         roles: userRolesStrings,
+        isEmailVerified: response.isEmailVerified,
       };
 
       if (response.token) {
@@ -101,6 +109,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     queryClient.clear();
   }, [queryClient]);
 
+  const updateVerificationStatus = useCallback((verified: boolean) => {
+    setUser(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, isEmailVerified: verified };
+      localStorage.setItem("user", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -111,6 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isLoading,
         login,
         logout,
+        updateVerificationStatus,
       }}
     >
       {children}

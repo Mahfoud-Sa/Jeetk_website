@@ -11,20 +11,32 @@ export const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setUnverifiedEmail('');
     setIsLoading(true);
     
     try {
       await login({ email, password });
     } catch (err: any) {
       console.error("Login error:", err);
-      const errorMsg = err.response?.data?.message || err.message || (language === 'ar' ? 'فشل تسجيل الدخول.' : 'Login failed.');
-      setError(errorMsg);
+      if (err.message && err.message.startsWith("delivery_unverified:")) {
+        const unverified = err.message.substring("delivery_unverified:".length);
+        setUnverifiedEmail(unverified);
+        setError(
+          language === 'ar'
+            ? 'يجب عليك تأكيد بريدك الإلكتروني كعامل توصيل لتتمكن من تسجيل الدخول.'
+            : 'You must verify your email as a delivery user before logging in.'
+        );
+      } else {
+        const errorMsg = err.response?.data?.message || err.message || (language === 'ar' ? 'فشل تسجيل الدخول.' : 'Login failed.');
+        setError(errorMsg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -91,7 +103,17 @@ export const LoginPage = () => {
           </div>
           
           {error && (
-            <p className="text-red-500 text-xs font-medium bg-red-50 p-3 rounded-lg">{error}</p>
+            <div className="bg-red-50 p-4 rounded-xl border border-red-100 flex flex-col gap-2 text-start">
+              <p className="text-red-600 text-xs font-semibold leading-relaxed">{error}</p>
+              {unverifiedEmail && (
+                <Link 
+                  to={`/verify-email?email=${encodeURIComponent(unverifiedEmail)}`}
+                  className="w-full text-center bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold text-xs transition-colors mt-1"
+                >
+                  {language === 'ar' ? 'تأكيد البريد الإلكتروني الآن' : 'Verify Email Now'}
+                </Link>
+              )}
+            </div>
           )}
 
           <button 
