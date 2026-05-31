@@ -26,6 +26,7 @@ import { DeliveryRoutesPage } from './pages/DeliveryRoutesPage';
 import { DeliveryRegistrationPage } from './pages/DeliveryRegistrationPage';
 import { LoginPage } from './pages/LoginPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { DashboardPage } from './pages/DashboardPage';
 
@@ -106,6 +107,11 @@ function AppContent() {
             <Route path="/forgot-password" element={
               <PublicRoute>
                 <ForgotPasswordPage />
+              </PublicRoute>
+            } />
+            <Route path="/reset-password" element={
+              <PublicRoute>
+                <ResetPasswordPage />
               </PublicRoute>
             } />
             <Route path="/verify-email" element={
