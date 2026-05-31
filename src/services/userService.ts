@@ -43,3 +43,7 @@ export const updateUser = async (id: number, user: Partial<User>): Promise<User>
 export const deleteUser = async (id: number): Promise<void> => {
   return apiClient.delete(`Users/${id}`);
 };
+
+export const changePassword = async (confirmedPassword: string, newPassword: string): Promise<any> => {
+  return apiClient.post(`Profile/change-password`, { confirmedPassword, newPassword });
+};
