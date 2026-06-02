@@ -45,7 +45,15 @@ export const forgotPassword = async (email: string): Promise<any> => {
 };
 
 export const resetPassword = async (email: string, token: string, newPassword: string): Promise<any> => {
-  return apiClient.post("Auth/reset-password", { email, token, newPassword });
+  return apiClient.post(
+    "Auth/change-password", 
+    { confirmedPassword: newPassword, newPassword },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
 };
 
 export const assignRole = async (userId: number, roleId: number): Promise<any> => {
