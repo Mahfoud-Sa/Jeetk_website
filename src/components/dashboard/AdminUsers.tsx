@@ -1,6 +1,7 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { 
-  Search, Eye, Edit, Trash2, X, CheckCircle2, Truck, UserPlus, User as UserIcon, EyeOff 
+  Search, Eye, Edit, Trash2, X, CheckCircle2, Truck, UserPlus, User as UserIcon, EyeOff,
+  Calendar, Clock, Plus, Loader2, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../../context/LanguageContext';
@@ -10,6 +11,17 @@ import {
 } from '../../services/userService';
 import { assignRole } from '../../services/authService';
 import { UserRole } from '../../types';
+import { fetchWorkingDays, createWorkingDay, deleteWorkingDay, WorkingDay } from '../../services/workingDaysService';
+
+const DAYS_OF_WEEK = [
+  { value: 0, labelEn: 'Sunday', labelAr: 'الأحد' },
+  { value: 1, labelEn: 'Monday', labelAr: 'الإثنين' },
+  { value: 2, labelEn: 'Tuesday', labelAr: 'الثلاثاء' },
+  { value: 3, labelEn: 'Wednesday', labelAr: 'الأربعاء' },
+  { value: 4, labelEn: 'Thursday', labelAr: 'الخميس' },
+  { value: 5, labelEn: 'Friday', labelAr: 'الجمعة' },
+  { value: 6, labelEn: 'Saturday', labelAr: 'السبت' },
+];
 
 export const AdminUsers = () => {
   const { t, language } = useLanguage();
@@ -24,6 +36,81 @@ export const AdminUsers = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
+
+  // Working Days Admin Management State
+  const [showWorkingDaysModal, setShowWorkingDaysModal] = useState(false);
+  const [selectedUserForSchedule, setSelectedUserForSchedule] = useState<any>(null);
+  const [workingDays, setWorkingDays] = useState<WorkingDay[]>([]);
+  const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
+  const [isAddingSchedule, setIsAddingSchedule] = useState(false);
+  const [newDay, setNewDay] = useState<number>(0);
+  const [newFromTime, setNewFromTime] = useState<string>("09:00");
+  const [newToTime, setNewToTime] = useState<string>("17:00");
+
+  const loadScheduleForUser = async (userId: number) => {
+    setIsLoadingSchedule(true);
+    try {
+      const data = await fetchWorkingDays(userId);
+      setWorkingDays(data || []);
+    } catch (err) {
+      console.error("Failed to load working days:", err);
+    } finally {
+      setIsLoadingSchedule(false);
+    }
+  };
+
+  const openWorkingDaysModal = async (user: any) => {
+    setSelectedUserForSchedule(user);
+    setShowWorkingDaysModal(true);
+    setNewDay(0);
+    setNewFromTime("09:00");
+    setNewToTime("17:00");
+    await loadScheduleForUser(user.id);
+  };
+
+  const handleAddSchedule = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForSchedule) return;
+    setIsAddingSchedule(true);
+    try {
+      await createWorkingDay({
+        userId: selectedUserForSchedule.id,
+        day: Number(newDay),
+        fromTime: newFromTime,
+        toTime: newToTime
+      });
+      showToast(
+        language === 'ar' ? 'تم إضافة يوم العمل للمندوب بنجاح' : 'Driver working day added successfully',
+        'success'
+      );
+      await loadScheduleForUser(selectedUserForSchedule.id);
+    } catch (err: any) {
+      showToast(
+        err?.response?.data?.message || err?.message || 
+        (language === 'ar' ? 'فشل إضافة يوم العمل' : 'Failed to add working day'),
+        'error'
+      );
+    } finally {
+      setIsAddingSchedule(false);
+    }
+  };
+
+  const handleDeleteSchedule = async (id: number) => {
+    if (!selectedUserForSchedule) return;
+    try {
+      await deleteWorkingDay(id);
+      showToast(
+        language === 'ar' ? 'تم حذف يوم العمل بنجاح' : 'Working day deleted successfully',
+        'success'
+      );
+      setWorkingDays(prev => prev.filter(w => w.id !== id));
+    } catch (err: any) {
+      showToast(
+        language === 'ar' ? 'فشل حذف يوم العمل' : 'Failed to delete working day',
+        'error'
+      );
+    }
+  };
 
   const [userForm, setUserForm] = useState({ 
     name: '', 
@@ -236,35 +323,47 @@ export const AdminUsers = () => {
                 <tr>
                    <td colSpan={5} className="px-6 py-12 text-center text-zinc-400">Loading...</td>
                 </tr>
-              ) : filteredUsers.map((user: any) => (
-                <tr key={user.id} className="hover:bg-zinc-50/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-bold">{user.name || user.fullName}</td>
-                  <td className="px-6 py-4 text-sm text-zinc-500">{user.email}</td>
-                  <td className="px-6 py-4">
-                    <span className="px-3 py-1 bg-zinc-100 text-zinc-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                      {user.role || (user.roles && user.roles[0]) || 'customer'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${user.isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                      {user.isActive ? t.dashboard.active : t.dashboard.inactive}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button onClick={() => openViewUser(user)} className="p-2 text-zinc-400 hover:text-primary transition-colors"><Eye className="w-4 h-4" /></button>
-                      <button onClick={() => openEditUser(user)} className="p-2 text-zinc-400 hover:text-black transition-colors"><Edit className="w-4 h-4" /></button>
-                      <button 
-                        onClick={() => toggleUserStatus(user.id)}
-                        className={`p-2 rounded-lg transition-colors ${user.isActive ? 'text-zinc-400 hover:text-red-500' : 'text-zinc-400 hover:text-emerald-500'}`}
-                      >
-                        {user.isActive ? <X className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-                      </button>
-                      <button onClick={() => { setUserToDelete(user.id); setShowDeleteConfirm(true); }} className="p-2 text-zinc-400 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              ) : filteredUsers.map((user: any) => {
+                const userRole = user.role || (user.roles && user.roles[0]) || 'customer';
+                return (
+                  <tr key={user.id} className="hover:bg-zinc-50/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-bold">{user.name || user.fullName}</td>
+                    <td className="px-6 py-4 text-sm text-zinc-500">{user.email}</td>
+                    <td className="px-6 py-4">
+                      <span className="px-3 py-1 bg-zinc-100 text-zinc-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                        {userRole}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${user.isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                        {user.isActive ? t.dashboard.active : t.dashboard.inactive}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        {userRole === 'delivery' && (
+                          <button 
+                            onClick={() => openWorkingDaysModal(user)} 
+                            className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+                            title={language === 'ar' ? 'إداره مواعيد وأيام عمل المندوب' : 'Manage Driver Working Days'}
+                          >
+                            <Calendar className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button onClick={() => openViewUser(user)} className="p-2 text-zinc-400 hover:text-primary transition-colors"><Eye className="w-4 h-4" /></button>
+                        <button onClick={() => openEditUser(user)} className="p-2 text-zinc-400 hover:text-black transition-colors"><Edit className="w-4 h-4" /></button>
+                        <button 
+                          onClick={() => toggleUserStatus(user.id)}
+                          className={`p-2 rounded-lg transition-colors ${user.isActive ? 'text-zinc-400 hover:text-red-500' : 'text-zinc-400 hover:text-emerald-500'}`}
+                        >
+                          {user.isActive ? <X className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                        </button>
+                        <button onClick={() => { setUserToDelete(user.id); setShowDeleteConfirm(true); }} className="p-2 text-zinc-400 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -295,6 +394,179 @@ export const AdminUsers = () => {
                 </div>
                 <button type="submit" className="w-full bg-black text-white py-4 rounded-xl font-bold">{t.dashboard.saveUser}</button>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {showWorkingDaysModal && selectedUserForSchedule && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white w-full max-w-4xl rounded-3xl p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <div className="text-start">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Calendar className="w-6 h-6 text-emerald-500 animate-pulse" />
+                    <span>{language === 'ar' ? 'أيام عمل المندوب' : 'Driver Working Schedule'}</span>
+                  </h2>
+                  <p className="text-xs text-zinc-500 mt-1 font-medium">
+                    {language === 'ar' 
+                      ? `إدارة الأيام وأوقات العمل لـ: ${selectedUserForSchedule.name || selectedUserForSchedule.fullName}` 
+                      : `Manage working days & times for: ${selectedUserForSchedule.name || selectedUserForSchedule.fullName}`}
+                  </p>
+                </div>
+                <button onClick={() => setShowWorkingDaysModal(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                {/* Left Column (2/5): Add Form */}
+                <div className="lg:col-span-2 bg-zinc-50 border border-zinc-100/50 p-6 rounded-2xl h-fit">
+                  <h3 className="text-sm font-bold text-zinc-900 border-b border-zinc-100 pb-3 mb-4 text-start flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-emerald-500" />
+                    {language === 'ar' ? 'إضافة موعد جديد' : 'Add New Duty slot'}
+                  </h3>
+
+                  <form onSubmit={handleAddSchedule} className="space-y-4">
+                    <div className="space-y-1.5 text-start">
+                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider px-1">
+                        {language === 'ar' ? 'اليوم' : 'Day'}
+                      </label>
+                      <select
+                        value={newDay}
+                        onChange={(e) => setNewDay(Number(e.target.value))}
+                        className="w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-medium"
+                      >
+                        {DAYS_OF_WEEK.map((d) => (
+                          <option key={d.value} value={d.value}>
+                            {language === 'ar' ? d.labelAr : d.labelEn}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5 text-start">
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider px-1">
+                          {language === 'ar' ? 'من الساعة' : 'From Time'}
+                        </label>
+                        <input
+                          type="time"
+                          required
+                          value={newFromTime}
+                          onChange={(e) => setNewFromTime(e.target.value)}
+                          className="w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1.5 text-start">
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider px-1">
+                          {language === 'ar' ? 'إلى الساعة' : 'To Time'}
+                        </label>
+                        <input
+                          type="time"
+                          required
+                          value={newToTime}
+                          onChange={(e) => setNewToTime(e.target.value)}
+                          className="w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isAddingSchedule}
+                      className="w-full h-11 bg-black hover:bg-zinc-900 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm shadow-md mt-6 disabled:opacity-50"
+                    >
+                      {isAddingSchedule ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          {language === 'ar' ? 'جاري الإضافة...' : 'Adding...'}
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          {language === 'ar' ? 'حفظ وإضافة' : 'Save & Add'}
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+
+                {/* Right Column (3/5): Current Duties list */}
+                <div className="lg:col-span-3 space-y-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-sm font-bold text-zinc-800 text-start">
+                      {language === 'ar' ? 'قائمة الفترات المسجلة' : 'Registered Duty Periods'}
+                    </h3>
+                    <button
+                      onClick={() => selectedUserForSchedule && loadScheduleForUser(selectedUserForSchedule.id)}
+                      className="p-1 px-2.5 border border-zinc-200 hover:bg-zinc-50 text-xs rounded-lg font-medium text-zinc-500 transition-all flex items-center gap-1.5"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>{language === 'ar' ? 'تحديث' : 'Reload'}</span>
+                    </button>
+                  </div>
+
+                  {isLoadingSchedule ? (
+                    <div className="flex flex-col items-center justify-center py-20 border border-zinc-100 rounded-2xl bg-zinc-50/30 space-y-3">
+                      <Loader2 className="w-8 h-8 animate-spin text-zinc-300" />
+                      <p className="text-sm text-zinc-400 font-medium">
+                        {language === 'ar' ? 'تحميل الفترات...' : 'Loading periods...'}
+                      </p>
+                    </div>
+                  ) : workingDays.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 px-4 bg-zinc-50/50 rounded-2xl border border-dashed border-zinc-200">
+                      <div className="p-3 bg-white rounded-full mb-3">
+                        <Clock className="w-5 h-5 text-zinc-300" />
+                      </div>
+                      <p className="text-sm font-bold text-zinc-500 text-center mb-0.5">
+                        {language === 'ar' ? 'هذا المندوب ليس لديه مواعيد حالياً' : 'No schedules defined yet'}
+                      </p>
+                      <p className="text-xs text-zinc-400 text-center max-w-sm">
+                        {language === 'ar' 
+                          ? 'استخدم النموذج لجدولة أوقات دوام المندوب المتاحة.' 
+                          : 'Use the form to schedule the available driver delivery duties.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1">
+                      {workingDays.map((w) => {
+                        const dayName = DAYS_OF_WEEK.find((d) => d.value === w.day);
+                        return (
+                          <div
+                            key={w.id}
+                            className="p-3 bg-white border border-zinc-100 rounded-xl flex items-center justify-between shadow-sm hover:border-zinc-200 transition-all text-start"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg shrink-0">
+                                <Calendar className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-sm text-zinc-800">
+                                  {language === 'ar' ? dayName?.labelAr : dayName?.labelEn}
+                                </h4>
+                                <p className="text-[11px] text-zinc-500 mt-0.5 flex items-center gap-1 font-mono">
+                                  <Clock className="w-3 h-3 text-zinc-400" />
+                                  <span>
+                                    {w.fromTime?.substring(0, 5)} - {w.toTime?.substring(0, 5)}
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <button
+                              onClick={() => w.id && handleDeleteSchedule(w.id)}
+                              className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                              title={language === 'ar' ? 'حذف' : 'Delete'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}
