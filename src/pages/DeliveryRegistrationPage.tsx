@@ -55,13 +55,14 @@ export const DeliveryRegistrationPage = () => {
     try {
       const payload = {
         ...formData,
+        username: formData.email, // Automatically use email as username
         birthDate: new Date(formData.birthDate).toISOString()
       };
       await registerDelivery(payload);
       setSuccess(true);
       setTimeout(() => {
-        navigate('/login');
-      }, 3000);
+        navigate('/delivery-welcome');
+      }, 2500);
     } catch (err: any) {
       console.error("Registration error:", err);
       const errorMsg = err.response?.data?.message || err.message || (language === 'ar' ? 'فشل التسجيل.' : 'Registration failed.');
@@ -87,14 +88,14 @@ export const DeliveryRegistrationPage = () => {
           </h1>
           <p className="text-zinc-500 mb-6">
             {language === 'ar' 
-              ? 'تم إنشاء حسابك بنجاح. سيتم توجيهك إلى صفحة تسجيل الدخول...' 
-              : 'Your account has been created successfully. Redirecting to login...'}
+              ? 'تم إنشاء حسابك بنجاح. سيتم توجيهك إلى صفحة الترحيب والملاحظات...' 
+              : 'Your account has been created successfully. Redirecting to the welcome page...'}
           </p>
           <button 
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/delivery-welcome')}
             className="w-full bg-black text-white py-4 rounded-xl font-bold"
           >
-            {t.nav.login}
+            {language === 'ar' ? 'عرض صفحة الملاحظات' : 'View Notes Page'}
           </button>
         </motion.div>
       </div>
@@ -129,60 +130,93 @@ export const DeliveryRegistrationPage = () => {
               <input 
                 type="text" 
                 className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                placeholder={language === 'ar' ? 'محمد احمد' : 'John Doe'}
+                placeholder={language === 'ar' ? 'أدخل اسمك الكامل مثلاً: أحمد محمد علي' : 'Enter your full name e.g., Ahmad Mohammad Ali'}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
               />
+              <p className="text-zinc-400 text-xs mt-1 ml-1 text-start">
+                {language === 'ar' ? 'ملاحظة: يرجى كتابة اسمك الثلاثي/الرباعي كما في الهوية.' : 'Note: Please write your full name as on your ID card.'}
+              </p>
             </div>
-            <div>
-              <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'اسم المستخدم' : 'Username'}</label>
-              <input 
-                type="text" 
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                placeholder="username"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'البريد الإلكتروني' : 'Email'}</label>
               <input 
                 type="email" 
                 className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                placeholder="user@example.com"
+                placeholder="example@mail.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
               />
+              <p className="text-zinc-400 text-xs mt-1 ml-1 text-start">
+                {language === 'ar' ? 'بريدك الإلكتروني المستخدم لتسجيل الدخول والاشعارات.' : 'Your email for logging in and notifications.'}
+              </p>
             </div>
-            <div className="flex flex-col gap-4">
-              <label className="block text-sm font-bold ml-1">{language === 'ar' ? 'أرقام الهاتف' : 'Phone Numbers'}</label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'تاريخ الميلاد' : 'Birth Date'}</label>
+              <input 
+                type="date" 
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                value={formData.birthDate}
+                onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                required
+              />
+              <p className="text-zinc-400 text-xs mt-1 ml-1 text-start">
+                {language === 'ar' ? 'يجب أن لا يقل العمر عن 18 عاماً.' : 'Must be at least 18 years old.'}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'العنوان الحالي' : 'Current Address'}</label>
+              <input 
+                type="text" 
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                placeholder={language === 'ar' ? 'المحافظة - المديرية - الشارع' : 'Governorate - District - Street'}
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                required
+              />
+              <p className="text-zinc-400 text-xs mt-1 ml-1 text-start">
+                {language === 'ar' ? 'مثال: صنعاء - حدة - جولة الرويشان' : 'e.g., Sanaa - Hadda - Rowishan Roundabout'}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-zinc-50/50 p-4 rounded-2xl border border-zinc-100 space-y-3">
+            <label className="block text-sm font-bold ml-1 text-start">{language === 'ar' ? 'أرقام الهاتف للتواصل' : 'Contact Phone Numbers'}</label>
+            <div className="space-y-3">
               {formData.phoneNumbers.map((phone, index) => (
                 <div key={index} className="flex flex-col md:flex-row gap-2">
-                  <div className="flex-[2]">
+                  <div className="flex-[2] text-start">
                     <input 
                       type="tel" 
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                      placeholder={index === 0 ? "770266408" : (language === 'ar' ? 'رقم الهاتف' : 'Phone number')}
+                      className="w-full px-4 py-3 bg-white border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                      placeholder={index === 0 ? (language === 'ar' ? 'رقم الهاتف الأساسي (مثال: 770266408)' : 'Primary phone number (e.g. 770266408)') : (language === 'ar' ? 'رقم هاتف إضافي' : 'Secondary phone number')}
                       value={phone.number}
                       onChange={(e) => updatePhoneNumber(index, 'number', e.target.value)}
                       required
                     />
+                    <p className="text-zinc-400 text-[11px] mt-1 ml-1">
+                      {index === 0 
+                        ? (language === 'ar' ? 'ملاحظة: هذا الرقم سيستخدم لاستقبال الإشعارات وتوصيل الطلبات.' : 'Note: This number is used to receive notifications and complete deliveries.') 
+                        : (language === 'ar' ? 'رقم احتياطي للتواصل في حال تعذر الأول.' : 'Backup number if primary is unreachable.')}
+                    </p>
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 text-start">
                     <input 
                       type="text" 
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                      placeholder={language === 'ar' ? 'النوع (مثلاً: أساسي)' : 'Type (e.g. Primary)'}
+                      className="w-full px-4 py-3 bg-white border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                      placeholder={language === 'ar' ? 'نوع الرقم (مثلاً: أساسي)' : 'Type (e.g. Primary)'}
                       value={phone.type}
                       onChange={(e) => updatePhoneNumber(index, 'type', e.target.value)}
                       required
                     />
+                    <p className="text-zinc-400 text-[11px] mt-1 ml-1">
+                      {language === 'ar' ? 'مثال: واتساب، اتصال، منزلي' : 'e.g., WhatsApp, Mobile, Home'}
+                    </p>
                   </div>
                   {index > 0 && (
                     <button 
@@ -195,38 +229,15 @@ export const DeliveryRegistrationPage = () => {
                   )}
                 </div>
               ))}
-              <button 
-                type="button" 
-                onClick={addPhoneNumber}
-                className="flex items-center gap-2 text-sm font-bold text-primary hover:underline ml-1"
-              >
-                <Plus className="w-4 h-4" />
-                {language === 'ar' ? 'إضافة رقم آخر' : 'Add another number'}
-              </button>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'تاريخ الميلاد' : 'Birth Date'}</label>
-            <input 
-              type="date" 
-              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-              value={formData.birthDate}
-              onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'العنوان' : 'Address'}</label>
-            <input 
-              type="text" 
-              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-              placeholder={language === 'ar' ? 'الشارع، المدينة' : 'Street, City'}
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              required
-            />
+            <button 
+              type="button" 
+              onClick={addPhoneNumber}
+              className="flex items-center gap-2 text-sm font-bold text-primary hover:underline ml-1 pt-1"
+            >
+              <Plus className="w-4 h-4" />
+              {language === 'ar' ? 'إضافة رقم هاتف آخر' : 'Add another phone number'}
+            </button>
           </div>
 
           <div>
@@ -250,6 +261,11 @@ export const DeliveryRegistrationPage = () => {
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
+            <p className="text-zinc-400 text-xs mt-1 ml-1 text-start">
+              {language === 'ar' 
+                ? 'استخدم كلمة مرور قوية مكونة من 8 خانات على الأقل (أرقام وحروف).' 
+                : 'Use a strong password with at least 8 characters (including numbers & letters).'}
+            </p>
           </div>
           
           {error && (

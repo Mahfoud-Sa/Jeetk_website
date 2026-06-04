@@ -24,6 +24,7 @@ import { TrackingPage } from './pages/TrackingPage';
 import { LocationsPage } from './pages/LocationsPage';
 import { DeliveryRoutesPage } from './pages/DeliveryRoutesPage';
 import { DeliveryRegistrationPage } from './pages/DeliveryRegistrationPage';
+import { DeliveryWelcomePage } from './pages/DeliveryWelcomePage';
 import { LoginPage } from './pages/LoginPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
@@ -98,6 +99,7 @@ function AppContent() {
             <Route path="/locations" element={<LocationsPage />} />
             <Route path="/routes" element={<DeliveryRoutesPage />} />
             <Route path="/register-delivery" element={<DeliveryRegistrationPage />} />
+            <Route path="/delivery-welcome" element={<DeliveryWelcomePage />} />
             
             <Route path="/login" element={
               <PublicRoute>
