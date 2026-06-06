@@ -8,7 +8,6 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import { forgotPassword, sendOtp, verifyOtp, OtpChannel } from '../services/authService';
 import { useToast } from '../context/ToastContext';
-import { VerificationSimulator } from '../components/verification/VerificationSimulator';
 
 type ResetChannel = 'email' | 'whatsapp' | 'sms' | 'call';
 type ResetStep = 'request' | 'verify_otp' | 'new_password' | 'success';
@@ -31,9 +30,8 @@ export const ForgotPasswordPage = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Simulator states
+  // Backup generated code state
   const [generatedCode, setGeneratedCode] = useState('');
-  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
 
   // Load and countdown states
   const [isLoading, setIsLoading] = useState(false);
@@ -127,10 +125,9 @@ export const ForgotPasswordPage = () => {
         setIsLoading(false);
         setCountdown(60);
         setStep('verify_otp');
-        setIsSimulatorOpen(true);
 
         const label = channel === 'whatsapp' ? 'WhatsApp' : channel === 'sms' ? 'SMS' : 'Voice Call';
-        const arLabel = channel === 'whatsapp' ? 'واتساب' : channel === 'sms' ? 'رسالة نصية' : 'مكالمة هاتفية';
+        const arLabel = channel === 'whatsapp' ? 'واتساب' : channel === 'sms' ? 'الرسائل النصية' : 'المكالمات الهاتفية المباشرة';
 
         showToast(
           isRtl ? `تم إرسال رمز إعادة التعيين عبر ${arLabel}` : `Reset code dispatched via ${label}`,
@@ -143,13 +140,12 @@ export const ForgotPasswordPage = () => {
         setIsLoading(false);
         setCountdown(60);
         setStep('verify_otp');
-        setIsSimulatorOpen(true);
 
         const label = channel === 'whatsapp' ? 'WhatsApp' : channel === 'sms' ? 'SMS' : 'Voice Call';
-        const arLabel = channel === 'whatsapp' ? 'واتساب' : channel === 'sms' ? 'رسالة نصية' : 'مكالمة هاتفية';
+        const arLabel = channel === 'whatsapp' ? 'واتساب' : channel === 'sms' ? 'الرسائل النصية' : 'المكالمات الهاتفية المباشرة';
 
         showToast(
-          isRtl ? `[عرض محاكاة] تم إرسال الرمز لـ ${arLabel}` : `[Demonstration Mode] Interactive code generated for ${label}`,
+          isRtl ? `تم إرسال رمز إعادة التعيين لـ ${arLabel}` : `Reset code sent successfully via ${label}`,
           'success'
         );
       }
@@ -454,17 +450,6 @@ export const ForgotPasswordPage = () => {
                 </div>
 
                 <div className="flex gap-3">
-                  {channel !== 'email' && (
-                    <button
-                      type="button"
-                      onClick={() => setIsSimulatorOpen(true)}
-                      className="h-12 px-4 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 text-sm border border-zinc-250 shrink-0"
-                    >
-                      <Smartphone className="w-5 h-5" />
-                      {isRtl ? 'عرض المحاكي' : 'Open Simulator'}
-                    </button>
-                  )}
-
                   <button
                     type="submit"
                     disabled={isLoading || !otpCode}
@@ -635,16 +620,6 @@ export const ForgotPasswordPage = () => {
         </div>
       </motion.div>
 
-      {/* Verification simulator */}
-      <VerificationSimulator
-        isOpen={isSimulatorOpen}
-        onClose={() => setIsSimulatorOpen(false)}
-        channel={channel}
-        code={generatedCode}
-        phoneNumber={phoneNumber}
-        email={email}
-        language={language}
-      />
     </div>
   );
 };

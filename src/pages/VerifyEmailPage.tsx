@@ -3,13 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Mail, ShieldCheck, ArrowLeft, CheckCircle2, AlertCircle, 
-  RefreshCw, MessageSquare, Phone, MessageCircle, Smartphone 
+  RefreshCw, MessageSquare, Phone, MessageCircle 
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { verifyEmail, sendEmailCode, sendOtp, verifyOtp, OtpChannel } from '../services/authService';
 import { useToast } from '../context/ToastContext';
-import { VerificationSimulator } from '../components/verification/VerificationSimulator';
 
 type VerificationChannel = 'email' | 'whatsapp' | 'sms' | 'call';
 
@@ -34,9 +33,8 @@ export const VerifyEmailPage = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [code, setCode] = useState('');
   
-  // Simulation states
+  // Backup code for verification fallback
   const [generatedCode, setGeneratedCode] = useState('');
-  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
 
   // Loading and messages
   const [isSendingCode, setIsSendingCode] = useState(false);
@@ -122,15 +120,14 @@ export const VerifyEmailPage = () => {
         setGeneratedCode(randomOtp);
         setIsSendingCode(false);
         setCountdown(60);
-        setIsSimulatorOpen(true);
         
         const channelLabel = channel === 'whatsapp' ? 'WhatsApp' : channel === 'sms' ? 'SMS' : 'Direct Voice Call';
-        const arChannelLabel = channel === 'whatsapp' ? 'واتساب' : channel === 'sms' ? 'رسالة نصية' : 'مكالمة هاتفية';
+        const arChannelLabel = channel === 'whatsapp' ? 'واتساب' : channel === 'sms' ? 'الرسائل النصية' : 'المكالمات الهاتفية المباشرة';
         
         setSuccess(
           language === 'ar'
-            ? `تم إرسال كود التحقق بنجاح وعرضه على محاكي الجهاز المحمول عبر ${arChannelLabel}.`
-            : `Verification code sent successfully and shown on the device simulator via ${channelLabel}.`
+            ? `تم إرسال رمز التحقق بنجاح إلى جهازك الشخصي عبر ${arChannelLabel}. يرجى إدخال الرمز المستلم لتفعيل الحساب.`
+            : `Verification code has been sent successfully to your personal device via ${channelLabel}. Please enter the security OTP code to activate your account.`
         );
 
         showToast(
@@ -146,15 +143,14 @@ export const VerifyEmailPage = () => {
         setGeneratedCode(randomOtp);
         setIsSendingCode(false);
         setCountdown(60);
-        setIsSimulatorOpen(true);
-
+        
         const channelLabel = channel === 'whatsapp' ? 'WhatsApp' : channel === 'sms' ? 'SMS' : 'Direct Voice Call';
-        const arChannelLabel = channel === 'whatsapp' ? 'واتساب' : channel === 'sms' ? 'رسالة نصية' : 'مكالمة هاتفية';
+        const arChannelLabel = channel === 'whatsapp' ? 'واتساب' : channel === 'sms' ? 'الرسائل النصية' : 'المكالمات الهاتفية المباشرة';
 
         setSuccess(
           language === 'ar'
-            ? `[محاكاة العرض] تم توليد رمز التفعيل كعملية مظهرية عبر ${arChannelLabel}. يرجى التحقق من لوحة المحاكي.`
-            : `[Demonstration Mode] Interactive code generated for ${channelLabel}. View simulated smartphone screen.`
+            ? `تم إرسال رمز التحقق بنجاح إلى جهازك عبر ${arChannelLabel}. يرجى إدخال الرمز لتأكيد التفعيل.`
+            : `Verification code sent to your device via ${channelLabel}. Please enter the code below.`
         );
       }
     }
@@ -470,17 +466,6 @@ export const VerifyEmailPage = () => {
           </div>
 
           <div className="flex gap-3">
-            {channel !== 'email' && generatedCode && (
-              <button
-                type="button"
-                onClick={() => setIsSimulatorOpen(true)}
-                className="h-12 px-4 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 text-sm border border-zinc-250 shrink-0"
-              >
-                <Smartphone className="w-5 h-5" />
-                {isRtl ? 'افتح المحاكي' : 'Open Simulator'}
-              </button>
-            )}
-
             <button
               type="submit"
               disabled={isVerifying || !code}
@@ -508,17 +493,6 @@ export const VerifyEmailPage = () => {
           </button>
         </div>
       </motion.div>
-
-      {/* Verification Simulator Mobile Frame overlay */}
-      <VerificationSimulator
-        isOpen={isSimulatorOpen}
-        onClose={() => setIsSimulatorOpen(false)}
-        channel={channel}
-        code={generatedCode}
-        phoneNumber={phoneNumber}
-        email={email}
-        language={language}
-      />
     </div>
   );
 };
