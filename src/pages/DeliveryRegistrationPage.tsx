@@ -21,6 +21,8 @@ export const DeliveryRegistrationPage = () => {
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
 
   const updatePhoneNumber = (index: number, field: 'number' | 'type', value: string) => {
@@ -50,6 +52,12 @@ export const DeliveryRegistrationPage = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (formData.password !== confirmPassword) {
+      setError(language === 'ar' ? 'كلمتا المرور غير متطابقتين.' : 'Passwords do not match.');
+      return;
+    }
+
     setIsLoading(true);
     
     try {
@@ -240,32 +248,62 @@ export const DeliveryRegistrationPage = () => {
             </button>
           </div>
 
-          <div>
-            <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'كلمة المرور' : 'Password'}</label>
-            <div className="relative">
-              <input 
-                type={showPassword ? "text" : "password"} 
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all pr-12"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-              />
-              <button
-                type="button"
-                onMouseDown={() => setShowPassword(true)}
-                onMouseUp={() => setShowPassword(false)}
-                onMouseLeave={() => setShowPassword(false)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'كلمة المرور' : 'Password'}</label>
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all pr-12"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                />
+                <button
+                  type="button"
+                  onMouseDown={() => setShowPassword(true)}
+                  onMouseUp={() => setShowPassword(false)}
+                  onMouseLeave={() => setShowPassword(false)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              <p className="text-zinc-400 text-xs mt-1 ml-1 text-start">
+                {language === 'ar' 
+                  ? 'استخدم كلمة مرور قوية مكونة من 8 خانات على الأقل (أرقام وحروف).' 
+                  : 'Use a strong password with at least 8 characters (including numbers & letters).'}
+              </p>
             </div>
-            <p className="text-zinc-400 text-xs mt-1 ml-1 text-start">
-              {language === 'ar' 
-                ? 'استخدم كلمة مرور قوية مكونة من 8 خانات على الأقل (أرقام وحروف).' 
-                : 'Use a strong password with at least 8 characters (including numbers & letters).'}
-            </p>
+
+            <div>
+              <label className="block text-sm font-bold mb-1.5 ml-1">{language === 'ar' ? 'تأكيد كلمة المرور' : 'Confirm Password'}</label>
+              <div className="relative">
+                <input 
+                  type={showConfirmPassword ? "text" : "password"} 
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all pr-12"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onMouseDown={() => setShowConfirmPassword(true)}
+                  onMouseUp={() => setShowConfirmPassword(false)}
+                  onMouseLeave={() => setShowConfirmPassword(false)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              <p className="text-zinc-400 text-xs mt-1 ml-1 text-start">
+                {language === 'ar' 
+                  ? 'أعد كتابة كلمة المرور للتأكيد.' 
+                  : 'Retype your password to confirm.'}
+              </p>
+            </div>
           </div>
           
           {error && (

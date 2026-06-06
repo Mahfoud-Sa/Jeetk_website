@@ -73,14 +73,36 @@ export const getToken = () => {
   return localStorage.getItem("token");
 };
 
+export enum OtpChannel {
+  Email = 0,
+  Sms = 1,
+  WhatsApp = 2,
+  Voice = 3,
+}
+
+export interface OtpRequest {
+  destination: string;
+  channel: OtpChannel;
+}
+
+export interface OtpVerifyRequest {
+  destination: string;
+  code: string;
+  channel: OtpChannel;
+}
+
+export const sendOtp = async (data: OtpRequest): Promise<any> => {
+  return apiClient.post("Auth/send", data);
+};
+
+export const verifyOtp = async (data: OtpVerifyRequest): Promise<any> => {
+  return apiClient.post("Auth/verify", data);
+};
+
 export const verifyEmail = async (email: string, code: string): Promise<any> => {
-  return apiClient.post("Auth/verify-email", { email, code });
+  return verifyOtp({ destination: email, code, channel: OtpChannel.Email });
 };
 
 export const sendEmailCode = async (email: string): Promise<any> => {
-  return apiClient.post("Auth/send-email", JSON.stringify(email), {
-    headers: {
-      "Content-Type": "application/json",
-    }
-  });
+  return sendOtp({ destination: email, channel: OtpChannel.Email });
 };

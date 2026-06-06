@@ -2,39 +2,69 @@ import { useQuery } from "@tanstack/react-query";
 import apiClient from "./apiClient";
 import { Order, CreateOrderRequest, ActionEntity } from "../types";
 
-export const fetchOrders = async (page = 1, pageSize = 100): Promise<Order[]> => {
-  const response = await apiClient.get(`Orders`, {
-    params: { page, pageSize }
-  });
-  if (Array.isArray(response)) return response;
-  if (response && typeof response === 'object' && Array.isArray((response as any).data)) return (response as any).data;
-  if (response && typeof response === 'object' && Array.isArray((response as any).items)) return (response as any).items;
-  return [];
+export const fetchOrders = async (page = 1, pageSize = 100, userId?: number | null): Promise<Order[]> => {
+  try {
+    const params: any = { page, pageSize };
+    if (userId) {
+      params.userId = userId;
+    }
+    const response = await apiClient.get(`Orders`, {
+      params,
+      ...({ skipGlobalError: true } as any)
+    });
+    if (Array.isArray(response)) return response;
+    if (response && typeof response === 'object' && Array.isArray((response as any).data)) return (response as any).data;
+    if (response && typeof response === 'object' && Array.isArray((response as any).items)) return (response as any).items;
+    return [];
+  } catch (error) {
+    console.warn("fetchOrders with query parameters failed, attempting fallback without pagination...", error);
+    try {
+      const response = await apiClient.get(`Orders`, {
+        ...({ skipGlobalError: true } as any)
+      });
+      if (Array.isArray(response)) return response;
+      if (response && typeof response === 'object' && Array.isArray((response as any).data)) return (response as any).data;
+      if (response && typeof response === 'object' && Array.isArray((response as any).items)) return (response as any).items;
+    } catch (fallbackError) {
+      console.warn("fetchOrders fallback without query parameters also failed:", fallbackError);
+    }
+    return [];
+  }
 };
 
 export const fetchOrderById = async (id: number): Promise<Order> => {
-  return apiClient.get(`Orders/${id}`);
+  try {
+    return await apiClient.get(`Orders/${id}`);
+  } catch (error) {
+    console.warn(`fetchOrderById for ${id} failed:`, error);
+    throw error;
+  }
 };
 
 export const fetchOrderHistory = async (id: number): Promise<ActionEntity[]> => {
-  const response = await apiClient.get(`Actions/entity`, {
-    params: { 
-      entityName: 'OrderEntity',
-      entityId: id,
-      page: 1, 
-      pageSize: 100
-    }
-  });
-  if (Array.isArray(response)) return response;
-  if (response && typeof response === 'object' && Array.isArray((response as any).data)) return (response as any).data;
-  if (response && typeof response === 'object' && Array.isArray((response as any).items)) return (response as any).items;
-  return [];
+  try {
+    const response = await apiClient.get(`Actions/entity`, {
+      params: { 
+        entityName: 'OrderEntity',
+        entityId: id,
+        page: 1, 
+        pageSize: 100
+      }
+    });
+    if (Array.isArray(response)) return response;
+    if (response && typeof response === 'object' && Array.isArray((response as any).data)) return (response as any).data;
+    if (response && typeof response === 'object' && Array.isArray((response as any).items)) return (response as any).items;
+    return [];
+  } catch (error) {
+    console.warn("fetchOrderHistory failed:", error);
+    return [];
+  }
 };
 
 export function useOrders(page = 1, pageSize = 100, userId?: number | null) {
   return useQuery<Order[]>({
     queryKey: ["orders", page, pageSize, userId],
-    queryFn: () => fetchOrders(page, pageSize),
+    queryFn: () => fetchOrders(page, pageSize, userId),
     staleTime: 1000 * 60 * 5,
   });
 }

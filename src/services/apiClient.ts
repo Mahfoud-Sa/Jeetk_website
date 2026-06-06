@@ -65,8 +65,22 @@ apiClient.interceptors.response.use(
       }
     }
 
-    const message = error.response?.data?.message || error.message || "An unexpected error occurred";
-    if (errorCallback) {
+    let message = error.response?.data?.message;
+    if (!message && error.response?.data?.errors) {
+      try {
+        message = Object.values(error.response.data.errors)
+          .flatMap((errs: any) => Array.isArray(errs) ? errs : [errs])
+          .filter(Boolean)
+          .join(", ");
+      } catch (e) {
+        console.error("Failed to parse API validation errors", e);
+      }
+    }
+    if (!message) {
+      message = error.response?.data?.title || error.message || "An unexpected error occurred";
+    }
+
+    if (errorCallback && !(error.config as any)?.skipGlobalError && !(error.config?.headers as any)?.['x-skip-global-error']) {
       errorCallback(message);
     }
     return Promise.reject(error);

@@ -34,7 +34,7 @@ export const fetchWorkingDays = async (userId: number): Promise<WorkingDay[]> =>
         return (response as any).data || (response as any).items || [];
       }
     } catch (innerError) {
-      console.error("Could not fetch working days from either endpoint:", innerError);
+      console.warn("Could not fetch working days from either endpoint:", innerError);
     }
   }
   return [];

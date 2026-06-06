@@ -24,14 +24,14 @@ export const LoginPage = () => {
     try {
       await login({ email, password });
     } catch (err: any) {
-      console.error("Login error:", err);
+      console.warn("Login error:", err);
       if (err.message && err.message.startsWith("delivery_unverified:")) {
         const unverified = err.message.substring("delivery_unverified:".length);
         setUnverifiedEmail(unverified);
         setError(
           language === 'ar'
-            ? 'يجب عليك تأكيد بريدك الإلكتروني كعامل توصيل لتتمكن من تسجيل الدخول.'
-            : 'You must verify your email as a delivery user before logging in.'
+            ? 'يجب عليك تأكيد حسابك اولا لتتمكن من تسجيل الدخول'
+            : 'You must verify your account first to be able to log in.'
         );
       } else {
         const errorMsg = err.response?.data?.message || err.message || (language === 'ar' ? 'فشل تسجيل الدخول.' : 'Login failed.');
@@ -103,15 +103,45 @@ export const LoginPage = () => {
           </div>
           
           {error && (
-            <div className="bg-red-50 p-4 rounded-xl border border-red-100 flex flex-col gap-2 text-start">
-              <p className="text-red-600 text-xs font-semibold leading-relaxed">{error}</p>
+            <div className="bg-red-50 p-5 rounded-2xl border border-red-100 flex flex-col gap-3 text-start">
+              <p className="text-red-700 text-sm font-bold leading-relaxed">{error}</p>
+              
               {unverifiedEmail && (
-                <Link 
-                  to={`/verify-email?email=${encodeURIComponent(unverifiedEmail)}`}
-                  className="w-full text-center bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold text-xs transition-colors mt-1"
-                >
-                  {language === 'ar' ? 'تأكيد البريد الإلكتروني الآن' : 'Verify Email Now'}
-                </Link>
+                <div className="mt-1 space-y-2 border-t border-red-200/50 pt-2">
+                  <p className="text-xs font-bold text-red-800">
+                    {language === 'ar' ? 'تأكيد الحساب عبر:' : 'Verify account via:'}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link
+                      to={`/verify-email?email=${encodeURIComponent(unverifiedEmail)}&channel=email`}
+                      className="bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-200 text-center py-2.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                      {language === 'ar' ? 'البريد الإلكتروني' : 'Email'}
+                    </Link>
+                    <Link
+                      to={`/verify-email?email=${encodeURIComponent(unverifiedEmail)}&channel=whatsapp`}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-center py-2.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0 animate-pulse" />
+                      {language === 'ar' ? 'واتساب' : 'WhatsApp'}
+                    </Link>
+                    <Link
+                      to={`/verify-email?email=${encodeURIComponent(unverifiedEmail)}&channel=sms`}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-center py-2.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                      {language === 'ar' ? 'رسالة نصية (SMS)' : 'SMS'}
+                    </Link>
+                    <Link
+                      to={`/verify-email?email=${encodeURIComponent(unverifiedEmail)}&channel=call`}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-center py-2.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                      {language === 'ar' ? 'مكالمة هاتفية مباشرة' : 'Direct Call'}
+                    </Link>
+                  </div>
+                </div>
               )}
             </div>
           )}
