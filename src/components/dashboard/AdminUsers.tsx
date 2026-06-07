@@ -1,13 +1,13 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { 
   Search, Eye, Edit, Trash2, X, CheckCircle2, Truck, UserPlus, User as UserIcon, EyeOff,
-  Calendar, Clock, Plus, Loader2, RefreshCw
+  Calendar, Clock, Plus, Loader2, RefreshCw, ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useToast } from '../../context/ToastContext';
 import { 
-  useUsers, updateUser, createUser, deleteUser, fetchUserById 
+  useUsers, updateUser, createUser, deleteUser, fetchUserById, verifyUserAccount 
 } from '../../services/userService';
 import { assignRole } from '../../services/authService';
 import { UserRole } from '../../types';
@@ -224,6 +224,24 @@ export const AdminUsers = () => {
     }
   };
 
+  const handleVerifyUser = async (id: number) => {
+    try {
+      await verifyUserAccount(id);
+      refetchUsers();
+      showToast(
+        language === 'ar' ? 'تم تفعيل وتأكيد حساب المستخدم بنجاح!' : 'User account verified and activated successfully!',
+        'success'
+      );
+    } catch (error: any) {
+      console.error("Failed to verify user account:", error);
+      showToast(
+        error?.response?.data?.message || error?.message ||
+        (language === 'ar' ? 'فشل تأكيد حساب المستخدم.' : 'Failed to verify user account.'),
+        'error'
+      );
+    }
+  };
+
   const openViewUser = async (user: any) => {
     try {
       const userDetails = await fetchUserById(user.id);
@@ -335,9 +353,14 @@ export const AdminUsers = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${user.isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                        {user.isActive ? t.dashboard.active : t.dashboard.inactive}
-                      </span>
+                      <div className="flex flex-col sm:flex-row gap-1.5 items-start sm:items-center">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${user.isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                          {user.isActive ? t.dashboard.active : t.dashboard.inactive}
+                        </span>
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${user.isAccountVerified || user.isEmailVerified ? 'bg-blue-100 text-blue-600 border border-blue-200 animate-pulse' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
+                          {user.isAccountVerified || user.isEmailVerified ? (language === 'ar' ? 'مؤكّد' : 'Verified') : (language === 'ar' ? 'غير مؤكّد' : 'Unverified')}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
@@ -352,6 +375,17 @@ export const AdminUsers = () => {
                         )}
                         <button onClick={() => openViewUser(user)} className="p-2 text-zinc-400 hover:text-primary transition-colors"><Eye className="w-4 h-4" /></button>
                         <button onClick={() => openEditUser(user)} className="p-2 text-zinc-400 hover:text-black transition-colors"><Edit className="w-4 h-4" /></button>
+                        
+                        {!(user.isAccountVerified || user.isEmailVerified) && (
+                          <button 
+                            onClick={() => handleVerifyUser(user.id)}
+                            className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                            title={language === 'ar' ? 'تأكيد الحساب يدويًا' : 'Verify Account Manually'}
+                          >
+                            <ShieldCheck className="w-4 h-4" />
+                          </button>
+                        )}
+
                         <button 
                           onClick={() => toggleUserStatus(user.id)}
                           className={`p-2 rounded-lg transition-colors ${user.isActive ? 'text-zinc-400 hover:text-red-500' : 'text-zinc-400 hover:text-emerald-500'}`}

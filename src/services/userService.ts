@@ -65,6 +65,10 @@ export const deleteUser = async (id: number): Promise<void> => {
   return apiClient.delete(`Users/${id}`);
 };
 
+export const verifyUserAccount = async (id: number): Promise<any> => {
+  return apiClient.put(`Users/${id}/verify-account`);
+};
+
 export const changePassword = async (confirmedPassword: string, newPassword: string): Promise<any> => {
   return apiClient.post(`Profile/change-password`, { confirmedPassword, newPassword });
 };

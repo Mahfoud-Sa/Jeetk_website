@@ -132,6 +132,8 @@ export interface User {
   username?: string;
   isActive: boolean;
   isDeleted?: boolean;
+  isEmailVerified?: boolean;
+  isAccountVerified?: boolean;
   createdAt?: string;
   updatedAt?: string | null;
   deletedAt?: string | null;
