@@ -10,6 +10,7 @@ interface AuthUser {
   username: string;
   roles: string[];
   isEmailVerified?: boolean;
+  isAccountVerified?: boolean;
 }
 
 interface AuthContextType {
@@ -64,8 +65,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         (typeof r === "string" ? r : r?.name || r?.role || "").toLowerCase()
       );
       
-      // Prevent delivery users who have not verified their email from logging in
-      if (userRolesStrings.includes("delivery") && response.isEmailVerified === false) {
+      // Prevent users who have not verified their account from logging in
+      if (response.isAccountVerified === false) {
         throw new Error("delivery_unverified:" + response.email);
       }
       
@@ -80,6 +81,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         username: response.username,
         roles: userRolesStrings,
         isEmailVerified: response.isEmailVerified,
+        isAccountVerified: response.isAccountVerified,
       };
 
       if (response.token) {
@@ -112,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateVerificationStatus = useCallback((verified: boolean) => {
     setUser(prev => {
       if (!prev) return null;
-      const updated = { ...prev, isEmailVerified: verified };
+      const updated = { ...prev, isEmailVerified: verified, isAccountVerified: verified };
       localStorage.setItem("user", JSON.stringify(updated));
       return updated;
     });

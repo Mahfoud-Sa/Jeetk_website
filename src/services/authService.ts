@@ -15,6 +15,7 @@ export interface LoginResponse {
   username: string;
   isActive: boolean;
   isEmailVerified?: boolean;
+  isAccountVerified?: boolean;
   roles: (string | any)[];
 }
 

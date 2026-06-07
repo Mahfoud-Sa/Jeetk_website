@@ -34,7 +34,7 @@ export const DashboardPage = () => {
         </button>
       </div>
 
-      {user && !user.isEmailVerified && (
+      {user && !user.isAccountVerified && (
         <div className="mb-8 p-6 bg-amber-50 border border-amber-100 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 bg-amber-100 border border-amber-200 rounded-2xl flex items-center justify-center shrink-0">
@@ -42,12 +42,12 @@ export const DashboardPage = () => {
             </div>
             <div className="text-start">
               <h3 className="font-bold text-amber-900">
-                {language === 'ar' ? 'البريد الإلكتروني غير مؤكد!' : 'Email Address Not Verified!'}
+                {language === 'ar' ? 'الحساب غير مؤكد!' : 'Account Not Verified!'}
               </h3>
               <p className="text-sm text-amber-700/90 mt-0.5">
                 {language === 'ar' 
-                  ? 'يرجى تأكيد بريدك الإلكتروني لتنشيط حسابك بالكامل وتلقي تحديثات حالة الطلب.'
-                  : 'Please verify your email address to fully activate your account and receive order status updates.'}
+                  ? 'يرجى تأكيد حسابك لتنشيطه بالكامل وتلقي تحديثات حالة الطلب.'
+                  : 'Please verify your account to fully activate your status and receive order updates.'}
               </p>
             </div>
           </div>
@@ -55,7 +55,7 @@ export const DashboardPage = () => {
             to="/verify-email"
             className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl text-sm font-bold flex items-center gap-2 transition-colors whitespace-nowrap shadow-sm shadow-amber-600/15"
           >
-            {language === 'ar' ? 'تأكيد البريد الآن' : 'Verify Email Now'}
+            {language === 'ar' ? 'تأكيد الحساب الآن' : 'Verify Account Now'}
             <ArrowRight className={`w-4 h-4 ${language === 'ar' ? 'rotate-180' : ''}`} />
           </Link>
         </div>
