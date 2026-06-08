@@ -2,6 +2,22 @@ import { useQuery } from "@tanstack/react-query";
 import apiClient from "./apiClient";
 import { Order, CreateOrderRequest, ActionEntity } from "../types";
 
+export const fetchUserOrders = async (userId: number, page = 1, pageSize = 20): Promise<Order[]> => {
+  try {
+    const response = await apiClient.get(`Users/${userId}/orders`, {
+      params: { page, pageSize },
+      ...({ skipGlobalError: true } as any)
+    });
+    if (Array.isArray(response)) return response;
+    if (response && typeof response === 'object' && Array.isArray((response as any).data)) return (response as any).data;
+    if (response && typeof response === 'object' && Array.isArray((response as any).items)) return (response as any).items;
+    return [];
+  } catch (error) {
+    console.warn(`fetchUserOrders for user ${userId} failed, falling back to empty list:`, error);
+    return [];
+  }
+};
+
 export const fetchOrders = async (page = 1, pageSize = 100, userId?: number | null): Promise<Order[]> => {
   try {
     const params: any = { page, pageSize };
