@@ -496,29 +496,31 @@ export const AdminUsers = () => {
       {/* Main Enterprise Table Canvas */}
       <div className="bg-white border border-zinc-150 rounded-3xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full">
             <thead>
-              <tr className="bg-zinc-50 border-b border-zinc-150 font-arabic">
-                {/* 1. Identity */}
-                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest">{t.dashboard.userName}</th>
-                {/* 2. Roles list */}
-                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest">{t.dashboard.userRole}</th>
-                {/* 3. Status badge */}
-                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest">{t.dashboard.userStatus}</th>
-                {/* 4. Activity timestamps */}
-                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest">{language === 'ar' ? 'النشاط الأخير' : 'Last Activity'}</th>
-                {/* 5. Assigned Orders counts */}
-                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest">{language === 'ar' ? 'عدد العقود' : 'Assigned Orders'}</th>
-                {/* 6. Communication lines check */}
-                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'خط الاتصال' : 'Contact Check'}</th>
-                {/* 7. Action controllers */}
-                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-right">Actions</th>
+              <tr className="bg-zinc-50 border-b border-zinc-150 font-arabic text-center">
+                {/* 1. Identity (Avatar) */}
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'الهوية' : 'Identity'}</th>
+                {/* 2. Name */}
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'الاسم' : 'Name'}</th>
+                {/* 3. Roles list */}
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'الدور' : 'Role'}</th>
+                {/* 4. Status badge */}
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'الحالة' : 'Status'}</th>
+                {/* 5. Activity timestamps */}
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'النشاط الأخير' : 'Last Activity'}</th>
+                {/* 6. Phone Number */}
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'رقم الهاتف' : 'Phone Number'}</th>
+                {/* 7. Assigned Orders counts */}
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'عدد الطلبات' : 'Total Orders'}</th>
+                {/* 8. Action controllers */}
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'العمليات' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {isUsersLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center text-zinc-500 font-semibold font-sans">
+                  <td colSpan={8} className="px-6 py-16 text-center text-zinc-500 font-semibold font-sans">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
                       <span>{language === 'ar' ? 'جاري جلب قائمة الحسابات والبيانات...' : 'Fetching live profile matrices...'}</span>
@@ -527,7 +529,7 @@ export const AdminUsers = () => {
                 </tr>
               ) : usersPagedData.items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center text-zinc-400 font-bold font-sans">
+                  <td colSpan={8} className="px-6 py-16 text-center text-zinc-400 font-bold font-sans">
                     {language === 'ar' ? 'لم يعثر على أية حسابات تطابق خيارات التصفية هذه' : 'No records match search parameters.'}
                   </td>
                 </tr>
@@ -570,9 +572,9 @@ export const AdminUsers = () => {
 
                   return (
                     <tr key={user.id} className="hover:bg-zinc-50/40 transition-colors">
-                      {/* Column 1: Identity */}
+                      {/* Column 1: Identity (Avatar) */}
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center">
                           {hasPic ? (
                             <img 
                               referrerPolicy="no-referrer"
@@ -589,21 +591,25 @@ export const AdminUsers = () => {
                               {user.fullName ? user.fullName.charAt(0).toUpperCase() : (user.name ? user.name.charAt(0).toUpperCase() : '?')}
                             </div>
                           )}
-                          <div className="min-w-0">
-                            <span 
-                              onClick={() => { setViewModalDefaultTab('overview'); openViewUser(user); }}
-                              className="text-sm font-extrabold text-zinc-900 block truncate hover:underline cursor-pointer"
-                            >
-                              {user.fullName || user.name || user.email}
-                            </span>
-                            <span className="text-xs text-zinc-400 block truncate font-mono">{user.email}</span>
-                          </div>
+                        </div>
+                      </td>
+
+                      {/* Column 2: Name */}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col items-center justify-center text-center min-w-0 max-w-[200px] mx-auto">
+                          <span 
+                            onClick={() => { setViewModalDefaultTab('overview'); openViewUser(user); }}
+                            className="text-sm font-extrabold text-zinc-900 block truncate hover:underline cursor-pointer"
+                          >
+                            {user.fullName || user.name || user.email}
+                          </span>
+                          <span className="text-xs text-zinc-400 block truncate font-mono">{user.email}</span>
                         </div>
                       </td>
 
                       {/* Column 2: Roles display as badge */}
                       <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1 justify-center">
                           {rolesList.map((r: string, idx: number) => {
                             const normalizedRole = r.toLowerCase();
                             return (
@@ -626,7 +632,7 @@ export const AdminUsers = () => {
 
                       {/* Column 3: Status Badge */}
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5 leading-none">
+                        <div className="flex items-center justify-center leading-none">
                           <span className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase shrink-0 flex items-center gap-1 leading-none ${customStyle.badge}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${customStyle.dot}`} />
                             {language === 'ar' ? (computedStatusStr === 'Inactive' ? 'غير نشط' : computedStatusStr === 'Active - Verified' ? 'نشط ومؤكد' : 'نشط - انتظار') : computedStatusStr}
@@ -636,8 +642,8 @@ export const AdminUsers = () => {
 
                       {/* Column 4: Activity Text */}
                       <td className="px-6 py-4">
-                        <div className="min-w-0" title={user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleString() : ''}>
-                          <span className="text-xs font-semibold text-zinc-700 font-sans block truncate">{activeText}</span>
+                        <div className="flex flex-col items-center justify-center text-center" title={user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleString() : ''}>
+                          <span className="text-xs font-semibold text-zinc-700 font-sans block truncate max-w-[150px]">{activeText}</span>
                           {user.lastActiveAt && (
                             <span className="text-[10px] text-zinc-400 mt-0.5 block truncate font-mono">
                               {new Date(user.lastActiveAt).toLocaleDateString(language === 'ar' ? 'ar-YE' : 'en-US')}
@@ -646,31 +652,30 @@ export const AdminUsers = () => {
                         </div>
                       </td>
 
-                      {/* Column 5: Total Orders counts */}
-                      <td className="px-6 py-4 font-mono font-bold text-xs text-zinc-805">
-                        {language === 'ar' 
-                          ? `${user.ordersCount || 0} طلبات` 
-                          : `${user.ordersCount || 0} orders`}
+                      {/* Column 5: Phone Number */}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <span className="text-xs font-bold text-zinc-700 font-mono">
+                            {user.phoneNumber || (user.phoneNumbers && user.phoneNumbers[0]?.number) || '-'}
+                          </span>
+                          {(user.hasPhoneNumber || user.phoneNumbers?.length) && (
+                            <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded-md mt-1 border border-emerald-100">
+                              {language === 'ar' ? 'مؤكد' : 'Verified'}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
-                      {/* Column 6: Phone linked check */}
+                      {/* Column 6: Total Orders counts */}
                       <td className="px-6 py-4">
-                        <div className="flex justify-center">
-                          {user.hasPhoneNumber || user.phoneNumbers?.length ? (
-                            <div className="w-5 h-5 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center border border-emerald-150" title={language === 'ar' ? 'رقم مسجل ومؤكد للمندوب بقواعدنا' : 'Verified contact checked'}>
-                              <Check className="w-3.5 h-3.5" />
-                            </div>
-                          ) : (
-                            <div className="w-5 h-5 bg-zinc-100 text-zinc-400 rounded-full flex items-center justify-center border border-zinc-200" title={language === 'ar' ? 'بانتظار إضافة تفاصيل الاتصال' : 'No contact info provided'}>
-                              <X className="w-3.5 h-3.5" />
-                            </div>
-                          )}
+                        <div className="text-center font-mono font-bold text-sm text-zinc-805">
+                          {user.ordersCount || 0}
                         </div>
                       </td>
 
                       {/* Column 7: Actions menu */}
                       <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2 text-right relative">
+                        <div className="flex items-center justify-center gap-2 relative">
                           <button
                             type="button"
                             onClick={() => { setViewModalDefaultTab('overview'); openViewUser(user); }}
