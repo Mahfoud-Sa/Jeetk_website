@@ -1,14 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { RESTAURANTS } from '../constants';
 import { RestaurantCard } from '../components/RestaurantCard';
+import { getRestaurants } from '../services/restaurantService';
+import { Restaurant } from '../types';
 
 export const RestaurantsPage = () => {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
 
-  const filteredRestaurants = RESTAURANTS.filter(res => 
+  useEffect(() => {
+    getRestaurants().then(setRestaurants);
+  }, []);
+
+  const filteredRestaurants = restaurants.filter(res => 
     res.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     res.category.toLowerCase().includes(searchQuery.toLowerCase())
   );

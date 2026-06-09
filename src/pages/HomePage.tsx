@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Sparkles, X, Clock, Navigation, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../context/LanguageContext';
-import { RESTAURANTS } from '../constants';
 import { RestaurantCard } from '../components/RestaurantCard';
 import { GoogleGenAI } from "@google/genai";
+import { getRestaurants } from '../services/restaurantService';
+import { Restaurant } from '../types';
 
 export const HomePage = () => {
   const { t, language } = useLanguage();
@@ -13,8 +14,13 @@ export const HomePage = () => {
   const [aiResponse, setAiResponse] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
 
-  const filteredRestaurants = RESTAURANTS.filter(res => 
+  useEffect(() => {
+    getRestaurants().then(setRestaurants);
+  }, []);
+
+  const filteredRestaurants = restaurants.filter(res => 
     res.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     res.category.toLowerCase().includes(searchQuery.toLowerCase())
   );

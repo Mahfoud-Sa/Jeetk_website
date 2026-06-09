@@ -1,14 +1,31 @@
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Star, Clock, ShoppingBag, Plus } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { RESTAURANTS, MENU_ITEMS } from '../constants';
-import { MenuItem } from '../types';
+import { MENU_ITEMS } from '../constants';
+import { MenuItem, Restaurant } from '../types';
+import { getRestaurantById } from '../services/restaurantService';
 
 export const RestaurantPage = ({ addToCart }: { addToCart: (item: MenuItem) => void }) => {
   const { id } = useParams();
   const { language } = useLanguage();
-  const restaurant = RESTAURANTS.find(r => r.id === id);
+  const [restaurant, setRestaurant] = useState<Restaurant | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (id) {
+      getRestaurantById(id).then(res => {
+        setRestaurant(res);
+        setIsLoading(false);
+      });
+    } else {
+      setIsLoading(false);
+    }
+  }, [id]);
+
   const menu = MENU_ITEMS[id || ''] || [];
+
+  if (isLoading) return <div className="p-20 text-center font-bold">{language === 'ar' ? 'جاري التحميل...' : 'Loading...'}</div>;
 
   if (!restaurant) return <div className="p-20 text-center font-bold">Restaurant not found</div>;
 
