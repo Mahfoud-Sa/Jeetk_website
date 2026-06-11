@@ -3,18 +3,51 @@ import { APIProvider, Map, AdvancedMarker, Pin, useMap, useMapsLibrary } from '@
 import { MapPin, Search, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 
-export const API_KEY =
-  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  '';
+const getApiKey = (): string => {
+  const envKey = process.env.GOOGLE_MAPS_PLATFORM_KEY || (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY;
+  const sanitizedEnvKey = envKey ? envKey.trim() : '';
+  
+  if (
+    sanitizedEnvKey && 
+    sanitizedEnvKey !== '' && 
+    sanitizedEnvKey !== 'YOUR_API_KEY' && 
+    sanitizedEnvKey !== 'undefined' && 
+    sanitizedEnvKey !== 'null'
+  ) {
+    return sanitizedEnvKey;
+  }
+  return 'AIzaSyBEiqXmX9-Gp9KXkF1LW9fO9B2GsacXpAc';
+};
 
-export const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY' && API_KEY !== '';
+export const API_KEY = getApiKey();
+
+// Log key loaded for diagnostics
+console.log(
+  "[Google Maps] Active Key loaded: %s...%s", 
+  API_KEY.substring(0, 6), 
+  API_KEY.substring(API_KEY.length - 4)
+);
+
+export const hasValidKey = Boolean(API_KEY) && 
+  API_KEY !== 'YOUR_API_KEY' && 
+  API_KEY !== 'undefined' && 
+  API_KEY !== 'null' && 
+  API_KEY !== '';
 
 interface MapAddressPickerProps {
-  onLocationSelect: (data: { name: string; address: string; googleMapsUrl: string }) => void;
+  onLocationSelect: (data: { 
+    name: string; 
+    address: string; 
+    googleMapsUrl: string;
+    latitude: number;
+    longitude: number;
+    googlePlaceId?: string;
+  }) => void;
   initialAddress?: string;
   initialName?: string;
   initialUrl?: string;
+  initialLat?: number;
+  initialLng?: number;
 }
 
 // Coordinate parsing helper
@@ -47,7 +80,14 @@ function InteractiveMap({
 }: { 
   position: { lat: number; lng: number }; 
   setPosition: (pos: { lat: number; lng: number }) => void;
-  onLocationSelect: (data: { name: string; address: string; googleMapsUrl: string }) => void;
+  onLocationSelect: (data: { 
+    name: string; 
+    address: string; 
+    googleMapsUrl: string;
+    latitude: number;
+    longitude: number;
+    googlePlaceId?: string;
+  }) => void;
   initialAddress?: string;
   initialName?: string;
 }) {
@@ -69,6 +109,13 @@ function InteractiveMap({
     autocompleteService.current = new google.maps.places.AutocompleteService();
     geocoder.current = new google.maps.Geocoder();
   }, [placesLib, map]);
+
+  // Sync map center when position changes
+  useEffect(() => {
+    if (map && position) {
+      map.panTo(position);
+    }
+  }, [map, position]);
 
   // Handle Query Changes
   const handleQueryChange = (val: string) => {
@@ -127,7 +174,10 @@ function InteractiveMap({
           onLocationSelect({
             name,
             address,
-            googleMapsUrl: `https://www.google.com/maps/?q=${lat},${lng}`
+            googleMapsUrl: `https://www.google.com/maps/?q=${lat},${lng}`,
+            latitude: lat,
+            longitude: lng,
+            googlePlaceId: prediction.place_id
           });
         }
       }
@@ -135,14 +185,39 @@ function InteractiveMap({
   };
 
   // Reverse Geocoding on Map Click
-  const handleMapClick = (e: google.maps.MapMouseEvent) => {
-    if (!e.latLng || !geocoder.current) return;
-    const lat = e.latLng.lat();
-    const lng = e.latLng.lng();
+  const handleMapClick = (e: any) => {
+    // Safely support both standard google maps event and vis.gl custom event wrappers
+    let latLng: google.maps.LatLng | null = null;
+    if (e.detail && e.detail.latLng) {
+      latLng = e.detail.latLng;
+    } else if (e.latLng) {
+      latLng = e.latLng;
+    }
+
+    if (!latLng) return;
+
+    const lat = typeof latLng.lat === 'function' ? latLng.lat() : (latLng as any).lat;
+    const lng = typeof latLng.lng === 'function' ? latLng.lng() : (latLng as any).lng;
+
+    if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) return;
+
     const newPos = { lat, lng };
     
+    // 1. Instantly place the red marker and pan the map
     setPosition(newPos);
     map?.panTo(newPos);
+
+    // 2. IMMEDIATELY update the form coordinate fields for instant user feedback
+    onLocationSelect({
+      name: typedName || `Branch / Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`,
+      address: typedAddress || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      googleMapsUrl: `https://www.google.com/maps/?q=${lat},${lng}`,
+      latitude: lat,
+      longitude: lng
+    });
+
+    // 3. Reverse Geocode in local background (if geocoder service is ready) to enrich details
+    if (!geocoder.current) return;
 
     geocoder.current.geocode({ location: newPos }, (results, status) => {
       if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
@@ -168,10 +243,14 @@ function InteractiveMap({
         setTypedAddress(address);
         setTypedName(nameSuggested);
 
+        // Update again with enriched address information
         onLocationSelect({
           name: nameSuggested,
           address,
-          googleMapsUrl: `https://www.google.com/maps/?q=${lat},${lng}`
+          googleMapsUrl: `https://www.google.com/maps/?q=${lat},${lng}`,
+          latitude: lat,
+          longitude: lng,
+          googlePlaceId: results[0].place_id
         });
       }
     });
@@ -219,14 +298,14 @@ function InteractiveMap({
       </div>
 
       {/* Main Map Elements Canvas */}
-      <div className="relative flex-1 rounded-2xl overflow-hidden border border-zinc-100 shadow-inner h-[320px] min-h-[300px]">
+      <div className="relative rounded-2xl overflow-hidden border border-zinc-150 shadow-inner h-[320px] min-h-[300px] bg-zinc-50 w-full">
         <Map
-          center={position}
-          zoom={14}
+          defaultCenter={position}
+          defaultZoom={14}
           mapId="DEMO_MAP_ID"
           onClick={handleMapClick}
           internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-          style={{ width: '100%', height: '100%' }}
+          style={{ width: '100%', height: '320px', minHeight: '320px' }}
           gestureHandling="cooperative"
           disableDefaultUI={false}
         >
@@ -272,21 +351,30 @@ export default function MapAddressPicker({
   onLocationSelect, 
   initialAddress = '', 
   initialName = '', 
-  initialUrl = '' 
+  initialUrl = '',
+  initialLat,
+  initialLng
 }: MapAddressPickerProps) {
   const { language } = useLanguage();
   const [position, setPosition] = useState<{ lat: number; lng: number }>(() => {
+    if (initialLat !== undefined && initialLng !== undefined && !isNaN(initialLat) && !isNaN(initialLng) && initialLat !== 0 && initialLng !== 0) {
+      return { lat: initialLat, lng: initialLng };
+    }
     const parsed = parseCoordsFromUrl(initialUrl);
     return parsed || { lat: 24.7136, lng: 46.6753 }; // Riyadh center coords default
   });
 
-  // Handle external initialUrl updates
+  // Handle external initialUrl, initialLat, initialLng updates
   useEffect(() => {
-    const parsed = parseCoordsFromUrl(initialUrl);
-    if (parsed) {
-      setPosition(parsed);
+    if (initialLat !== undefined && initialLng !== undefined && !isNaN(initialLat) && !isNaN(initialLng) && initialLat !== 0 && initialLng !== 0) {
+      setPosition({ lat: initialLat, lng: initialLng });
+    } else {
+      const parsed = parseCoordsFromUrl(initialUrl);
+      if (parsed) {
+        setPosition(parsed);
+      }
     }
-  }, [initialUrl]);
+  }, [initialUrl, initialLat, initialLng]);
 
   if (!hasValidKey) {
     return (
