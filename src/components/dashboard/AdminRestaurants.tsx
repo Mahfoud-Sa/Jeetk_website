@@ -1,25 +1,40 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Plus, X, Search, Edit, Trash2, Utensils, Sparkles, Star, Clock, DollarSign, Image as ImageIcon } from 'lucide-react';
+import { 
+  Plus, X, Search, Edit, Trash2, Utensils, Star, Clock, DollarSign, 
+  Image as ImageIcon, Loader2, RefreshCw, AlertCircle, Sparkles
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useToast } from '../../context/ToastContext';
 import { Restaurant } from '../../types';
 import { 
-  getRestaurants, 
+  getRestaurantsPaged, 
   createRestaurant, 
   updateRestaurant, 
-  deleteRestaurant 
+  deleteRestaurant,
+  PaginatedRestaurantsResponse
 } from '../../services/restaurantService';
 
 export const AdminRestaurants = () => {
   const { t, language } = useLanguage();
   const { showToast } = useToast();
   
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  // Advanced Server-Side Pagination, Debounced Search, and Category Filtering
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-
+  
+  const [restaurantsPagedData, setRestaurantsPagedData] = useState<PaginatedRestaurantsResponse>({
+    items: [],
+    totalItems: 0,
+    page: 1,
+    pageSize: 10,
+    totalPages: 1
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [showModal, setShowModal] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState<Restaurant | null>(null);
 
@@ -28,38 +43,58 @@ export const AdminRestaurants = () => {
     name: '',
     category: 'Burgers',
     deliveryTime: '20-30 min',
-    deliveryFee: 500,
+    deliveryFee: 350,
     image: '',
     description: '',
     rating: 4.5
   });
 
-  const loadData = async () => {
+  // Debouncing search updates to optimize network requests
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // Reset to page 1 on active search typing
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  const loadPagedRestaurants = async () => {
     setIsLoading(true);
     try {
-      const data = await getRestaurants();
-      setRestaurants(data);
+      const data = await getRestaurantsPaged(
+        currentPage,
+        pageSize,
+        debouncedSearch,
+        selectedCategory
+      );
+      setRestaurantsPagedData(data);
     } catch (err) {
-      console.error("Failed to fetch restaurants list", err);
+      console.error("Failed to fetch paginated restaurants:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-    
-    // Listen to reactive restaurant updates in other places
+    loadPagedRestaurants();
+  }, [currentPage, pageSize, debouncedSearch, selectedCategory]);
+
+  useEffect(() => {
+    // Listen to reactive restaurant updates across the platform (such as menu items updates)
     const handleUpdate = () => {
-      loadData();
+      loadPagedRestaurants();
     };
     window.addEventListener("jeetk_restaurants_updated", handleUpdate);
     return () => {
       window.removeEventListener("jeetk_restaurants_updated", handleUpdate);
     };
-  }, []);
+  }, [currentPage, pageSize, debouncedSearch, selectedCategory]);
 
-  const handleCreate = async (e: FormEvent) => {
+  const refetchRestaurants = () => {
+    loadPagedRestaurants();
+  };
+
+  const handleCreateSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.description.trim()) {
       showToast(
@@ -82,25 +117,26 @@ export const AdminRestaurants = () => {
         rating: Number(form.rating) || 4.5
       });
 
-      // Clear form
+      // Clear form & close modal
       setForm({
         name: '',
         category: 'Burgers',
         deliveryTime: '20-30 min',
-        deliveryFee: 500,
+        deliveryFee: 350,
         image: '',
         description: '',
         rating: 4.5
       });
+      setShowModal(false);
 
-      await loadData();
+      await loadPagedRestaurants();
       showToast(
-        language === 'ar' ? 'تمت إضافة المطعم الجديد بنجاح!' : 'Restaurant added successfully!',
+        language === 'ar' ? 'تمت إضافة المطعم الجديد بنجاح في النظام!' : 'New restaurant added successfully in the API backend!',
         'success'
       );
     } catch (err) {
       showToast(
-        language === 'ar' ? 'فشل إتمام عملية تسجيل المطعم' : 'Failed to register the restaurant',
+        language === 'ar' ? 'فشل إتمام عملية تسجيل المطعم' : 'Failed to register the restaurant in the backend',
         'error'
       );
     }
@@ -110,20 +146,34 @@ export const AdminRestaurants = () => {
     if (!confirm(language === 'ar' ? 'هل أنت متأكد من رغبتك في حذف هذا المطعم بالكامل؟' : 'Are you sure you want to completely delete this restaurant?')) return;
     try {
       await deleteRestaurant(id);
-      await loadData();
+      await loadPagedRestaurants();
       showToast(
-        language === 'ar' ? 'تم توقيف وإزالة سجل المطعم بنجاح' : 'Restaurant deleted successfully!',
+        language === 'ar' ? 'تم حذف سجل المطعم بنجاح' : 'Restaurant deleted successfully from the API backend!',
         'success'
       );
     } catch (err) {
       showToast(
-        language === 'ar' ? 'فشل استبعاد المطعم من قاعدة البيانات' : 'Failed to delete restaurant',
+        language === 'ar' ? 'فشل حذف المطعم من قاعدة البيانات' : 'Failed to delete restaurant from the backend',
         'error'
       );
     }
   };
 
-  const openEdit = (res: Restaurant) => {
+  const openAddModal = () => {
+    setEditingRestaurant(null);
+    setForm({
+      name: '',
+      category: 'Burgers',
+      deliveryTime: '20-30 min',
+      deliveryFee: 350,
+      image: '',
+      description: '',
+      rating: 4.5
+    });
+    setShowModal(true);
+  };
+
+  const openEditModal = (res: Restaurant) => {
     setEditingRestaurant(res);
     setForm({
       name: res.name,
@@ -159,7 +209,6 @@ export const AdminRestaurants = () => {
         rating: Number(form.rating) || 4.5
       });
 
-      await loadData();
       setShowModal(false);
       setEditingRestaurant(null);
       // Reset form
@@ -167,19 +216,20 @@ export const AdminRestaurants = () => {
         name: '',
         category: 'Burgers',
         deliveryTime: '20-30 min',
-        deliveryFee: 500,
+        deliveryFee: 350,
         image: '',
         description: '',
         rating: 4.5
       });
 
+      await loadPagedRestaurants();
       showToast(
-        language === 'ar' ? 'تم تعديل مصفوفة بيانات المطعم وبنود الخدمة بنجاح!' : 'Restaurant updated successfully!',
+        language === 'ar' ? 'تم تعديل بيانات المطعم بنجاح!' : 'Restaurant updated successfully in the API backend!',
         'success'
       );
     } catch (err) {
       showToast(
-        language === 'ar' ? 'حدث خطأ أثناء إجراء التعديل' : 'Failed to update restaurant',
+        language === 'ar' ? 'حدث خطأ أثناء إجراء التعديل' : 'Failed to update restaurant in the backend',
         'error'
       );
     }
@@ -187,290 +237,250 @@ export const AdminRestaurants = () => {
 
   const categoriesList = ['Burgers', 'Japanese', 'Italian', 'Healthy', 'Pizza', 'Desserts', 'Arabic', 'Indian'];
 
-  const filteredRestaurants = restaurants.filter(res => {
-    const matchesSearch = 
-      res.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      res.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      res.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesCategory = selectedCategory === 'all' || res.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
   return (
-    <div className="space-y-8">
-      {/* Visual Header */}
+    <div className="space-y-6 text-start font-arabic">
+      {/* Enterprise Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold font-sans text-zinc-900 tracking-tight flex items-center gap-3">
-            <Utensils className="w-8 h-8 text-primary shrink-0" />
-            {language === 'ar' ? 'إدارة المطاعم الشريكة' : 'Manage Restaurants'}
-          </h1>
-          <p className="text-sm font-bold text-zinc-500 mt-1">
-            {language === 'ar' ? 'إضافة وتعديل وحذف سجلات المطاعم، تحديد التصنيف، وأوقات ورسوم خدمات التوصيل.' : 'Add, edit and monitor corporate restaurants, establish delivery bounds, categories, and service timings.'}
+          <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900">{language === 'ar' ? 'إدارة المطاعم الشريكة' : 'Partner Restaurants'}</h1>
+          <p className="text-sm text-zinc-500 mt-1 font-medium">
+            {language === 'ar' 
+              ? 'إدارة سجلات المطاعم الشريكة، ربط الفروع الجغرافية، تعيين الأطباق وتصنيف الأطعمة والأسعار.' 
+              : 'Add, update and oversee corporate dining partners, culinary classifications, ratings and delivery rates.'}
           </p>
         </div>
+        <div className="flex gap-2">
+          {/* Refresh Action Trigger */}
+          <button
+            type="button"
+            onClick={refetchRestaurants}
+            className="p-3 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-2xl text-zinc-600 transition-all cursor-pointer hover:rotate-180 duration-500 shadow-sm"
+            title={language === 'ar' ? 'تحديث البيانات' : 'Refresh database'}
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+          
+          {/* Add Restaurant button matching the style of Add User */}
+          <button 
+            type="button"
+            onClick={openAddModal}
+            className="bg-black text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-zinc-900 transition-all shadow-md hover:scale-[1.01] cursor-pointer"
+          >
+            <Plus className="w-5 h-5 text-white" />
+            <span>{language === 'ar' ? 'إضافة مطعم شريك' : 'Add Restaurant'}</span>
+          </button>
+        </div>
       </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-        
-        {/* Left Aspect: Create Form Panel */}
-        <div className="xl:col-span-5 bg-white border border-zinc-100 rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col gap-6">
-          <div className="border-b border-zinc-100 pb-4">
-            <h2 className="text-xl font-extrabold flex items-center gap-2.5 text-zinc-800">
-              <Plus className="w-5.5 h-5.5 text-primary" />
-              {language === 'ar' ? 'تسجيل مطعم جديد' : 'Register New Restaurant'}
-            </h2>
-          </div>
-
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                {language === 'ar' ? 'اسم المطعم' : 'Restaurant Name'}
-              </label>
-              <input 
-                type="text" 
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold" 
-                value={form.name} 
-                onChange={e => setForm({ ...form, name: e.target.value })} 
-                required 
-                placeholder={language === 'ar' ? 'مثال: برجر هاوس الذهبي' : 'e.g. Golden Burger House'}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                  {language === 'ar' ? 'التصنيف الرئيسي' : 'Main Category'}
-                </label>
-                <select 
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold"
-                  value={form.category} 
-                  onChange={e => setForm({ ...form, category: e.target.value })}
-                >
-                  {categoriesList.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                  {language === 'ar' ? 'التقييم الأولي' : 'Initial Rating'}
-                </label>
-                <input 
-                  type="number" 
-                  step="0.1"
-                  max="5"
-                  min="1"
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold" 
-                  value={form.rating} 
-                  onChange={e => setForm({ ...form, rating: parseFloat(e.target.value) || 4.5 })} 
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                  {language === 'ar' ? 'وقت التوصيل المقدر' : 'Est. Delivery Time'}
-                </label>
-                <input 
-                  type="text" 
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold" 
-                  value={form.deliveryTime} 
-                  onChange={e => setForm({ ...form, deliveryTime: e.target.value })} 
-                  placeholder="20-30 min"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                  {language === 'ar' ? 'رسوم التوصيل (هللة)' : 'Delivery Fee (Halalas)'}
-                </label>
-                <input 
-                  type="number" 
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold font-mono" 
-                  value={form.deliveryFee} 
-                  onChange={e => setForm({ ...form, deliveryFee: parseInt(e.target.value) || 0 })} 
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                {language === 'ar' ? 'رابط صورة الغلاف المعبرة' : 'Cover Image URL'}
-              </label>
-              <input 
-                type="url" 
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold" 
-                value={form.image} 
-                onChange={e => setForm({ ...form, image: e.target.value })} 
-                placeholder="https://images.unsplash.com/promo-burger..." 
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                {language === 'ar' ? 'شرح ووصف المطعم' : 'Restaurant Description'}
-              </label>
-              <textarea 
-                rows={3}
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold resize-none" 
-                value={form.description} 
-                onChange={e => setForm({ ...form, description: e.target.value })} 
-                required 
-                placeholder={language === 'ar' ? 'وصف الوجبات والامتيازات...' : 'Describe gourmet bounds, organic secrets, etc.'}
-              />
-            </div>
-
-            <div className="pt-2">
-              <button 
-                type="submit" 
-                className="w-full py-3.5 bg-black text-white text-xs font-bold rounded-xl hover:bg-zinc-800 active:scale-[0.99] transition-all shadow-sm"
-              >
-                {language === 'ar' ? 'تسجيل وحفظ المطعم' : 'Register Restaurant'}
-              </button>
-            </div>
-          </form>
+      
+      {/* Advanced Filter Racks */}
+      <div className="flex flex-col md:flex-row gap-4 mb-3">
+        <div className="flex-1 relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 font-bold" />
+          <input 
+            type="text" 
+            placeholder={language === 'ar' ? 'ابحث باسم المطعم، التصنيف، الوصف...' : 'Search by name, category, profile details...'}
+            className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all text-sm font-semibold"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
 
-        {/* Right Aspect: Existing Restaurants Directories with search & filter panel */}
-        <div className="xl:col-span-7 space-y-5">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <h2 className="text-xl font-extrabold text-zinc-800">
-              {language === 'ar' ? 'المطاعم المسجلة حالياً' : 'Registered Restaurants'}
-            </h2>
-            <span className="text-xs font-bold px-2.5 py-1 bg-zinc-100/80 text-zinc-600 rounded-full border border-zinc-200 shadow-inner">
-              {restaurants.length} {language === 'ar' ? 'شريك' : 'partners'}
+        {/* Categories Filter Dropdown */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider hidden sm:inline">{language === 'ar' ? 'التصنيف' : 'Category'}</span>
+          <select 
+            className="px-4 py-3 bg-white border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-xs font-bold text-zinc-700 font-sans cursor-pointer"
+            value={selectedCategory}
+            onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}
+          >
+            <option value="all">{language === 'ar' ? 'كافة التصنيفات' : 'All Categories'}</option>
+            {categoriesList.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Main Enterprise Restaurants Table Canvas */}
+      <div className="bg-white border border-zinc-150 rounded-3xl overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-zinc-50 border-b border-zinc-150 text-center">
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'الغلاف' : 'Cover'}</th>
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'اسم الـمـطـعـم والـوصـف' : 'Restaurant & Description'}</th>
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'التصنيف الرئيسي' : 'Main Category'}</th>
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'التقييم' : 'Rating'}</th>
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'وقت التوصيل' : 'Delivery Time'}</th>
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'رسوم التوصيل' : 'Delivery Fee'}</th>
+                <th className="px-6 py-4 font-bold text-xs text-zinc-500 uppercase tracking-widest text-center">{language === 'ar' ? 'العمليات' : 'Actions'}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center text-zinc-500 font-semibold font-sans">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
+                      <span>{language === 'ar' ? 'جاري استيراد وجلب قائمة المطاعم الشريكة...' : 'Connecting to API server and fetching live directory...'}</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : restaurantsPagedData.items.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center text-zinc-400 font-bold font-sans">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <Utensils className="w-8 h-8 text-zinc-300" />
+                      <span>{language === 'ar' ? 'لم يتم العثور على أي مطاعم مسجلة حالياً تطابق الشروط.' : 'No restaurant profiles matched the current query.'}</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                restaurantsPagedData.items.map((res) => {
+                  return (
+                    <tr key={res.id} className="hover:bg-zinc-50/40 transition-colors">
+                      {/* Column 1: Cover image */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center">
+                          <img 
+                            referrerPolicy="no-referrer"
+                            src={res.image} 
+                            alt={res.name}
+                            className="w-12 h-12 rounded-xl object-cover shrink-0 border border-zinc-150 shadow-inner"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/restaurant/200';
+                            }}
+                          />
+                        </div>
+                      </td>
+
+                      {/* Column 2: Name & Description */}
+                      <td className="px-6 py-4 text-center max-w-xs">
+                        <div className="font-extrabold text-sm text-zinc-800 leading-tight block">{res.name}</div>
+                        <p className="text-xs text-zinc-500 font-medium line-clamp-2 mt-1 mx-auto leading-relaxed">{res.description}</p>
+                      </td>
+
+                      {/* Column 3: Category with Beautiful Custom Badges style */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${
+                            res.category === 'Burgers' ? 'bg-indigo-50 border-indigo-100 text-indigo-700' :
+                            res.category === 'Italian' ? 'bg-amber-50 border-amber-100 text-amber-700' :
+                            res.category === 'Arabic' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
+                            res.category === 'Japanese' ? 'bg-purple-50 border-purple-100 text-purple-700' :
+                            res.category === 'Healthy' ? 'bg-sky-50 border-sky-100 text-sky-700' :
+                            'bg-zinc-100 border-zinc-200 text-zinc-700'
+                          }`}>
+                            {res.category}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Column 4: Rating */}
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1 font-bold text-xs font-mono text-zinc-800">
+                          <Star className="w-3.5 h-3.5 text-amber-550 fill-current" />
+                          <span>{res.rating}</span>
+                        </div>
+                      </td>
+
+                      {/* Column 5: Delivery Time */}
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1 text-xs font-bold text-zinc-500 font-sans">
+                          <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>{res.deliveryTime}</span>
+                        </div>
+                      </td>
+
+                      {/* Column 6: Delivery Fee */}
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1 font-bold text-xs text-zinc-800 font-mono">
+                          <DollarSign className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>{res.deliveryFee === 0 ? (language === 'ar' ? 'مجاني' : 'Free') : `${res.deliveryFee} ${language === 'ar' ? 'رس' : 'YER'}`}</span>
+                        </div>
+                      </td>
+
+                      {/* Column 7: Action Controllers */}
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button 
+                            type="button"
+                            onClick={() => openEditModal(res)} 
+                            className="p-2 text-zinc-500 hover:text-black hover:bg-zinc-100 rounded-xl transition-all cursor-pointer"
+                            title={language === 'ar' ? 'تعديل بيانات الشريك' : 'Edit Partner Info'}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleDelete(res.id)} 
+                            className="p-2 text-zinc-400 hover:text-red-650 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
+                            title={language === 'ar' ? 'حذف الشريك نهائياً' : 'Delete Partner'}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Server Side Pagination Control footer bar matching AdminUsers.tsx */}
+        <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-150 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-4">
+            <span className="text-[11px] font-bold text-zinc-500 font-mono">
+              {language === 'ar' 
+                ? `عرض ${restaurantsPagedData.items.length} سجل من إجمالي ${restaurantsPagedData.totalItems} مطعم شريك`
+                : `Showing ${restaurantsPagedData.items.length} of ${restaurantsPagedData.totalItems} registered partners`}
             </span>
-          </div>
 
-          {/* Search bar and Category filter pills */}
-          <div className="bg-white border border-zinc-100 rounded-2xl p-4 gap-4 flex flex-col">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" />
-              <input 
-                type="text" 
-                placeholder={language === 'ar' ? 'ابحث باسم المطعم أو التصنيف...' : 'Search by name or category...'}
-                className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => setSelectedCategory('all')}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-extrabold border transition-all ${
-                  selectedCategory === 'all' 
-                    ? 'bg-black text-white border-black' 
-                    : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'
-                }`}
+            {/* Page Limit selector dropdown */}
+            <div className="flex items-center gap-1.5 ml-2">
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{language === 'ar' ? 'حجم السجل:' : 'Limit:'}</span>
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                className="px-2 py-1 bg-white border border-zinc-200 text-[10px] font-bold rounded-lg outline-none cursor-pointer"
               >
-                {language === 'ar' ? 'الكل' : 'All'}
-              </button>
-              {categoriesList.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-extrabold border transition-all ${
-                    selectedCategory === cat 
-                      ? 'bg-black text-white border-black' 
-                      : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
             </div>
           </div>
 
-          {isLoading ? (
-            <div className="bg-white border border-zinc-100 rounded-3xl p-12 text-center text-zinc-400">
-              <span className="animate-spin inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full mb-3" />
-              <p className="text-xs font-bold">{language === 'ar' ? 'جاري استيراد سجلات الشركاء والمطاعم...' : 'Fetching restaurant directory...'}</p>
-            </div>
-          ) : filteredRestaurants.length === 0 ? (
-            <div className="bg-white border border-zinc-100 rounded-3xl p-12 text-center text-zinc-400 space-y-2">
-              <Utensils className="w-8 h-8 text-zinc-300 mx-auto" />
-              <p className="text-xs font-bold">
-                {language === 'ar' ? 'لم يتم العثور على مطاعم تطابق معايير البحث.' : 'No restaurants matched your queries.'}
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-1">
-              {filteredRestaurants.map(res => (
-                <div 
-                  key={res.id} 
-                  className="bg-white border border-zinc-100 rounded-2xl p-4 flex flex-col justify-between shadow-sm hover:shadow-md transition-all group relative overflow-hidden"
-                >
-                  {/* Decorative tag for category */}
-                  <div className="absolute top-3 right-3 bg-zinc-50/90 text-zinc-500 text-[9px] font-extrabold px-2 py-0.5 rounded-full border border-zinc-150">
-                    {res.category}
-                  </div>
-
-                  <div className="flex gap-3 min-w-0">
-                    <img 
-                      src={res.image} 
-                      alt={res.name} 
-                      className="w-16 h-16 rounded-xl object-cover shrink-0 border border-zinc-100"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="min-w-0">
-                      <h4 className="font-extrabold text-sm text-zinc-800 truncate mb-1 group-hover:text-primary transition-colors pr-10">
-                        {res.name}
-                      </h4>
-                      <p className="text-[11px] text-zinc-500 font-medium line-clamp-2 leading-snug mb-2 pr-1">
-                        {res.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-zinc-100/80 pt-3 mt-3 flex items-center justify-between text-[10px] font-bold text-zinc-500">
-                    <div className="flex gap-2.5">
-                      <span className="flex items-center gap-0.5 text-amber-500">
-                        <Star className="w-3 h-3 fill-current" />
-                        {res.rating}
-                      </span>
-                      <span className="flex items-center gap-0.5">
-                        <Clock className="w-3 h-3 text-zinc-400" />
-                        {res.deliveryTime}
-                      </span>
-                      <span className="flex items-center gap-0.5">
-                        <DollarSign className="w-3 h-3 text-zinc-400" />
-                        {res.deliveryFee === 0 ? (language === 'ar' ? 'مجاني' : 'Free') : `${(res.deliveryFee / 100).toFixed(2)} SAR`}
-                      </span>
-                    </div>
-
-                    <div className="flex gap-1">
-                      <button 
-                        onClick={() => openEdit(res)} 
-                        className="p-1.5 text-zinc-400 hover:text-black hover:bg-zinc-100 rounded-md transition-all"
-                        title={language === 'ar' ? 'تعديل السجل' : 'Edit directory'}
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(res.id)} 
-                        className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-rose-50 rounded-md transition-all"
-                        title={language === 'ar' ? 'تعطيل الشريك' : 'De-provision partner'}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={currentPage === 1 || isLoading}
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              className="px-4 py-2 bg-white border border-zinc-200 hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+            >
+              {language === 'ar' ? 'السابق' : 'Previous'}
+            </button>
+            <span className="flex items-center px-3.5 text-xs font-mono font-bold text-zinc-800 bg-white border border-zinc-200 rounded-xl">
+              {currentPage} / {restaurantsPagedData.totalPages || 1}
+            </span>
+            <button
+              type="button"
+              disabled={currentPage >= restaurantsPagedData.totalPages || isLoading}
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, restaurantsPagedData.totalPages))}
+              className="px-4 py-2 bg-white border border-zinc-200 hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+            >
+              {language === 'ar' ? 'التالي' : 'Next'}
+            </button>
+          </div>
         </div>
-
       </div>
 
-      {/* Editing Dialog Modal */}
+      {/* Editing & Addition Dialogue Overlay Modal */}
       <AnimatePresence>
-        {showModal && editingRestaurant && (
+        {showModal && (
           <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
@@ -485,9 +495,11 @@ export const AdminRestaurants = () => {
             >
               <div className="flex justify-between items-center mb-6 pb-4 border-b border-zinc-100">
                 <div className="flex items-center gap-2.5">
-                  <Edit className="w-5 h-5 text-primary" />
-                  <h2 className="text-xl font-extrabold text-zinc-800">
-                    {language === 'ar' ? 'تعديل بيانات المطعم' : 'Edit Restaurant'}
+                  <Utensils className="w-5 h-5 text-zinc-900" />
+                  <h2 className="text-xl font-black text-zinc-905">
+                    {editingRestaurant 
+                      ? (language === 'ar' ? 'تعديل بيانات المطعم الشريك' : 'Edit Restaurant Profile')
+                      : (language === 'ar' ? 'تسجيل مطعم جديد' : 'Register New Partner')}
                   </h2>
                 </div>
                 <button 
@@ -495,33 +507,36 @@ export const AdminRestaurants = () => {
                     setShowModal(false);
                     setEditingRestaurant(null);
                   }} 
-                  className="p-2 hover:bg-zinc-100 rounded-full transition-colors"
+                  className="p-2 hover:bg-zinc-100 rounded-full transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5 text-zinc-400" />
                 </button>
               </div>
 
-              <form onSubmit={handleUpdateSubmit} className="space-y-4">
-                <div>
+              <form onSubmit={editingRestaurant ? handleUpdateSubmit : handleCreateSubmit} className="space-y-4">
+                {/* Name */}
+                <div className="text-start">
                   <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                    {language === 'ar' ? 'اسم المطعم' : 'Restaurant Name'}
+                    {language === 'ar' ? 'اسم المطعم (مطلوب)' : 'Restaurant Name (Required)'}
                   </label>
                   <input 
                     type="text" 
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold" 
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 text-xs font-bold text-zinc-800" 
                     value={form.name} 
                     onChange={e => setForm({ ...form, name: e.target.value })} 
                     required 
+                    placeholder={language === 'ar' ? 'مثال: مطعم مذاقي السياحي' : 'e.g. My Taste Restaurant'}
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  {/* Category */}
+                  <div className="text-start">
                     <label className="block text-xs font-bold text-zinc-500 mb-1.5">
                       {language === 'ar' ? 'التصنيف الرئيسي' : 'Main Category'}
                     </label>
                     <select 
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 text-xs font-bold text-zinc-800 cursor-pointer"
                       value={form.category} 
                       onChange={e => setForm({ ...form, category: e.target.value })}
                     >
@@ -531,16 +546,17 @@ export const AdminRestaurants = () => {
                     </select>
                   </div>
 
-                  <div>
+                  {/* Rating */}
+                  <div className="text-start">
                     <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                      {language === 'ar' ? 'التقييم الحالي' : 'Current Rating'}
+                      {language === 'ar' ? 'التقييم الأصلي' : 'Initial Rating'}
                     </label>
                     <input 
                       type="number" 
                       step="0.1"
                       max="5"
                       min="1"
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold" 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 text-xs font-bold font-mono text-zinc-800" 
                       value={form.rating} 
                       onChange={e => setForm({ ...form, rating: parseFloat(e.target.value) || 4.5 })} 
                     />
@@ -548,72 +564,81 @@ export const AdminRestaurants = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  {/* Delivery time */}
+                  <div className="text-start">
                     <label className="block text-xs font-bold text-zinc-500 mb-1.5">
                       {language === 'ar' ? 'وقت التوصيل المقدر' : 'Est. Delivery Time'}
                     </label>
                     <input 
                       type="text" 
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold" 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 text-xs font-bold text-zinc-800" 
                       value={form.deliveryTime} 
                       onChange={e => setForm({ ...form, deliveryTime: e.target.value })} 
+                      placeholder="20-30 min"
                     />
                   </div>
 
-                  <div>
+                  {/* Delivery fee */}
+                  <div className="text-start">
                     <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                      {language === 'ar' ? 'رسوم التوصيل (هللة)' : 'Delivery Fee (Halalas)'}
+                      {language === 'ar' ? 'رسوم التوصيل (ريال)' : 'Delivery Fee (YER)'}
                     </label>
                     <input 
                       type="number" 
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold font-mono" 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 text-xs font-bold font-mono text-zinc-800" 
                       value={form.deliveryFee} 
                       onChange={e => setForm({ ...form, deliveryFee: parseInt(e.target.value) || 0 })} 
                     />
                   </div>
                 </div>
 
-                <div>
+                {/* Banner image URL */}
+                <div className="text-start">
                   <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                    {language === 'ar' ? 'رابط صورة الغلاف' : 'Cover Image URL'}
+                    {language === 'ar' ? 'رابط صورة الغلاف (اختياري)' : 'Cover Image URL (Optional)'}
                   </label>
                   <input 
                     type="url" 
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold" 
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 text-xs font-bold text-zinc-800" 
                     value={form.image} 
                     onChange={e => setForm({ ...form, image: e.target.value })} 
+                    placeholder="https://images.unsplash.com/..." 
                   />
                 </div>
 
-                <div>
+                {/* Description */}
+                <div className="text-start">
                   <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                    {language === 'ar' ? 'شرح ووصف المطعم' : 'Restaurant Description'}
+                    {language === 'ar' ? 'وصف المطعم والوجبات (مطلوب)' : 'Restaurant Description (Required)'}
                   </label>
                   <textarea 
-                    rows={3} 
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold resize-none" 
+                    rows={3}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 text-xs font-bold resize-none font-arabic text-zinc-800 leading-relaxed" 
                     value={form.description} 
                     onChange={e => setForm({ ...form, description: e.target.value })} 
                     required 
+                    placeholder={language === 'ar' ? 'برجر مشوي ممتاز وذو تقييم عالي يقدم أشهى المأكولات...' : 'Gourmet burgers and local delicacies with ultra-fast delivery.'}
                   />
                 </div>
 
-                <div className="pt-2 flex justify-end gap-3 border-t border-zinc-100 pt-4">
+                <div className="pt-4 flex justify-end gap-3 border-t border-zinc-100 mt-4">
                   <button 
                     type="button" 
                     onClick={() => {
                       setShowModal(false);
                       setEditingRestaurant(null);
                     }} 
-                    className="px-5 py-3 border border-zinc-200 rounded-xl text-xs font-bold hover:bg-zinc-50 transition-colors"
+                    className="px-5 py-3 border border-zinc-200 rounded-xl text-xs font-bold hover:bg-zinc-50 transition-colors cursor-pointer"
                   >
                     {language === 'ar' ? 'إلغاء الأمر' : 'Cancel'}
                   </button>
                   <button 
                     type="submit" 
-                    className="px-6 py-3 bg-black text-white rounded-xl text-xs font-bold hover:bg-zinc-800 active:scale-[0.99] transition-all"
+                    className="px-6 py-3 bg-black text-white rounded-xl text-xs font-bold hover:bg-zinc-900 active:scale-[0.99] transition-all shadow-sm cursor-pointer"
                   >
-                    {language === 'ar' ? 'حفظ التغييرات' : 'Save Changes'}
+                    {editingRestaurant 
+                      ? (language === 'ar' ? 'حفظ التغييرات' : 'Save Changes')
+                      : (language === 'ar' ? 'إضافة المطعم الشريك' : 'Register Restaurant Partner')}
                   </button>
                 </div>
               </form>

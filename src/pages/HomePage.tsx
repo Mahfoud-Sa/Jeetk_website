@@ -1,12 +1,32 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Sparkles, X, Clock, Navigation, ChevronRight } from 'lucide-react';
+import { Search, Sparkles, X, Clock, Navigation, ChevronRight, Truck, Utensils, Percent, MapPin, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../context/LanguageContext';
 import { RestaurantCard } from '../components/RestaurantCard';
 import { GoogleGenAI } from "@google/genai";
 import { getRestaurants } from '../services/restaurantService';
 import { Restaurant } from '../types';
+import { getLandingFeatures, ICON_MAP } from '../components/dashboard/AdminFeatures';
+
+interface WebMainContent {
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  lastUpdated?: string;
+}
+
+interface WebCard {
+  id: number;
+  icon: string;
+  title: string;
+  subtitle: string;
+}
+
+interface WebPathContent {
+  title: string;
+  path: string;
+}
 
 export const HomePage = () => {
   const { t, language } = useLanguage();
@@ -15,9 +35,52 @@ export const HomePage = () => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [landingFeatures, setLandingFeatures] = useState<any[]>([]);
+
+  // API dynamic contents
+  const [mainContent, setMainContent] = useState<WebMainContent | null>(null);
+  const [apiCards, setApiCards] = useState<WebCard[]>([]);
+  const [activePath, setActivePath] = useState<WebPathContent | null>(null);
 
   useEffect(() => {
     getRestaurants().then(setRestaurants);
+    
+    // Load dynamic homepage cards
+    setLandingFeatures(getLandingFeatures());
+    
+    const handleStorageChange = () => {
+      setLandingFeatures(getLandingFeatures());
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    // Fetch dynamic content from endpoints
+    fetch('https://jeetk-api.runasp.net/api/WebsiteContent/main-content')
+      .then(res => {
+        if (!res.ok) throw new Error('API request failed');
+        return res.json();
+      })
+      .then((data: WebMainContent) => setMainContent(data))
+      .catch(err => console.error("Error fetching main-content:", err));
+
+    fetch('https://jeetk-api.runasp.net/api/WebsiteContent/cards')
+      .then(res => {
+        if (!res.ok) throw new Error('API request failed');
+        return res.json();
+      })
+      .then((data: WebCard[]) => setApiCards(data))
+      .catch(err => console.error("Error fetching cards:", err));
+
+    fetch('https://jeetk-api.runasp.net/api/WebsiteContent/path')
+      .then(res => {
+        if (!res.ok) throw new Error('API request failed');
+        return res.json();
+      })
+      .then((data: WebPathContent) => setActivePath(data))
+      .catch(err => console.error("Error fetching path:", err));
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const filteredRestaurants = restaurants.filter(res => 
@@ -123,26 +186,58 @@ export const HomePage = () => {
 
       {/* Hero Section */}
       {!searchQuery && (
-        <section className="py-20 md:py-32 text-center">
+        <section className="py-20 md:py-24 text-center flex flex-col items-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
+            className="w-full flex flex-col"
           >
             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 hero-gradient-text">
-              {t.home.heroTitle}
+              {mainContent ? mainContent.title : t.home.heroTitle}
             </h1>
             <p className="text-zinc-500 text-lg md:text-xl max-w-2xl mx-auto mb-10">
-              {t.home.heroSubtitle}
+              {mainContent ? mainContent.subtitle : t.home.heroSubtitle}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="bg-primary text-white px-10 py-4 rounded-full font-bold hover:scale-105 transition-transform shadow-lg shadow-primary/25">
+              <button className="bg-primary text-white px-10 py-4 rounded-full font-bold hover:scale-105 transition-transform shadow-lg shadow-primary/25 cursor-pointer">
                 {language === 'ar' ? 'اطلب الآن' : 'Order Now'}
               </button>
               <Link to="/routes" className="bg-white text-black border border-zinc-200 px-10 py-4 rounded-full font-bold hover:bg-zinc-50 transition-colors">
                 {t.nav.deliveryPrices}
               </Link>
             </div>
+
+            {/* Custom hero background banner derived from mainContent API imageUrl */}
+            {mainContent?.imageUrl && (
+              <div className="mt-12 max-w-5xl w-full mx-auto rounded-3xl overflow-hidden shadow-2xl border border-zinc-150 relative group bg-neutral-50 aspect-[21/9]">
+                <img 
+                  src={mainContent.imageUrl} 
+                  onError={(e) => {
+                    // Fallback to high-quality unsplash food collage background if local image is unavailable
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80";
+                  }}
+                  alt={mainContent.title}
+                  className="w-full h-full object-cover group-hover:scale-101 transition-all duration-700"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent flex flex-col md:flex-row items-start md:items-end p-6 md:p-10 justify-between text-start gap-4">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold tracking-widest text-white/70 uppercase">
+                      {language === 'ar' ? 'الواجهة مدمجة عبر ملقم جيتك' : 'API SYNCHRONIZED INTERFACE'}
+                    </span>
+                    <h4 className="text-lg md:text-3xl font-extrabold text-white mt-1">
+                      {mainContent.title}
+                    </h4>
+                  </div>
+                  {mainContent.lastUpdated && (
+                    <span className="text-[9px] font-mono text-white/60 bg-white/15 px-3 py-1.5 rounded-lg backdrop-blur-xs select-none border border-white/10">
+                      Sync: {new Date(mainContent.lastUpdated).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </motion.div>
         </section>
       )}
@@ -150,35 +245,68 @@ export const HomePage = () => {
       {/* Features Section */}
       <section className="py-20 border-t border-zinc-100">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">Why choose Jeetk?</h2>
-          <p className="text-zinc-500">Experience the next generation of food delivery.</p>
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">
+            {language === 'ar' ? 'لماذا تختار جيتك؟' : 'Why choose Jeetk?'}
+          </h2>
+          <p className="text-zinc-500">
+            {language === 'ar' 
+              ? 'جرّب الجيل القادم من خدمات توصيل الأطعمة السريعة والمبتكرة.' 
+              : 'Experience the next generation of food delivery.'}
+          </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            { 
-              title: 'Lightning Fast', 
-              desc: 'Average delivery time of 25 minutes. We don\'t just deliver; we sprint.',
-              icon: Clock
-            },
-            { 
-              title: 'AI Suggestions', 
-              desc: 'Not sure what to eat? Our AI knows your taste better than you do.',
-              icon: Sparkles
-            },
-            { 
-              title: 'Transparent Pricing', 
-              desc: 'No hidden fees. Check delivery prices between any two points instantly.',
-              icon: Navigation
-            }
-          ].map((feature, i) => (
-            <div key={i} className="p-10 rounded-3xl border border-zinc-100 bg-white hover:border-primary hover:-translate-y-2 transition-all duration-300 group text-start">
-              <div className="w-14 h-14 bg-zinc-50 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-primary/10 transition-colors">
-                <feature.icon className="w-7 h-7 text-zinc-400 group-hover:text-primary transition-colors" />
-              </div>
-              <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-              <p className="text-zinc-500 leading-relaxed">{feature.desc}</p>
-            </div>
-          ))}
+          {apiCards && apiCards.length > 0 ? (
+            apiCards.map((card) => {
+              const cardNormalized = (card.icon || '').toLowerCase();
+              let CompIcon = Sparkles;
+              let textAccent = 'group-hover:text-amber-500';
+              
+              if (cardNormalized.includes('delivery')) {
+                CompIcon = Truck;
+                textAccent = 'group-hover:text-rose-500';
+              } else if (cardNormalized.includes('restaurant')) {
+                CompIcon = Utensils;
+                textAccent = 'group-hover:text-amber-500';
+              } else if (cardNormalized.includes('discount') || cardNormalized.includes('deal')) {
+                CompIcon = Percent;
+                textAccent = 'group-hover:text-emerald-500';
+              }
+
+              return (
+                <div 
+                  key={card.id}
+                  className="p-10 rounded-3xl border border-zinc-100 bg-white hover:border-primary hover:-translate-y-2 transition-all duration-300 group text-start flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="w-14 h-14 bg-zinc-50 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-primary/10 transition-colors">
+                      <CompIcon className={`w-7 h-7 text-zinc-400 ${textAccent} transition-colors`} />
+                    </div>
+                    <h3 className="text-xl font-bold mb-3">{card.title}</h3>
+                    <p className="text-zinc-500 leading-relaxed text-sm">{card.subtitle}</p>
+                  </div>
+                  <div className="mt-6 pt-4 border-t border-zinc-100 flex justify-between items-center text-[10px] text-zinc-400 font-mono">
+                    <span>ID: #{card.id}</span>
+                    <span className="uppercase text-[8px] tracking-wider font-extrabold text-primary">Active Node</span>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            landingFeatures.map((feature, i) => {
+              const IconComponent = ICON_MAP[feature.icon] || Sparkles;
+              const cardTitle = language === 'ar' ? feature.titleAr || feature.titleEn : feature.titleEn || feature.titleAr;
+              const cardDesc = language === 'ar' ? feature.descAr || feature.descEn : feature.descEn || feature.descAr;
+              return (
+                <div key={feature.id || i} className="p-10 rounded-3xl border border-zinc-100 bg-white hover:border-primary hover:-translate-y-2 transition-all duration-300 group text-start">
+                  <div className="w-14 h-14 bg-zinc-50 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-primary/10 transition-colors">
+                    <IconComponent className="w-7 h-7 text-zinc-400 group-hover:text-primary transition-colors" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3">{cardTitle}</h3>
+                  <p className="text-zinc-500 leading-relaxed text-sm">{cardDesc}</p>
+                </div>
+              );
+            })
+          )}
         </div>
       </section>
 

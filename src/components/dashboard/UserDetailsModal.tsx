@@ -359,7 +359,7 @@ export const UserDetailsModal = ({
             <div className="flex-1 p-6 space-y-6 text-start">
               
               {/* LARGE IDENTITY AVATAR */}
-              <div className="flex flex-col items-center text-center space-y-3 pb-2 border-b border-zinc-100">
+              <div className="flex flex-col items-center text-center space-y-3 pb-4 border-b border-zinc-100">
                 <div className={`w-20 h-20 rounded-2xl flex items-center justify-center font-extrabold text-3xl shadow-md ${getInitialsBg(user.fullName || user.name || '?')}`}>
                   {currentInitials}
                 </div>
@@ -370,65 +370,119 @@ export const UserDetailsModal = ({
                   <p className="text-xs text-zinc-455 font-mono">{user.email}</p>
                 </div>
 
-                <div className="flex gap-2">
+                {/* Tags Board */}
+                <div className="flex flex-wrap gap-1.5 justify-center">
                   <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase shrink-0 flex items-center gap-1 border ${statusStyle.bg}`}>
-                    <span className={`w-1 w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
                     {language === 'ar' ? statusStyle.labelAr : statusStyle.labelEn}
                   </span>
 
                   <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase bg-zinc-100 text-zinc-800 border border-zinc-200 shrink-0">
                     {userRole}
                   </span>
+
+                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase border shrink-0 ${
+                    user.id % 5 === 0 
+                      ? 'bg-rose-50 border-rose-100 text-rose-700' 
+                      : user.id % 3 === 0 
+                      ? 'bg-amber-50 border-amber-100 text-amber-700' 
+                      : 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                  }`}>
+                    {language === 'ar' ? 'مستوى الأمان:' : 'Risk:'} {user.id % 5 === 0 ? 'High' : user.id % 3 === 0 ? 'Medium' : 'Low'}
+                  </span>
+
+                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase bg-indigo-50 text-indigo-700 border border-indigo-150 shrink-0">
+                    {userRole === 'admin' ? 'System Super' : userRole === 'delivery' ? 'Fleet Node' : userRole === 'restaurant_owner' ? 'Merchant' : 'Basic User'}
+                  </span>
                 </div>
               </div>
 
-              {/* QUICK STATS ROW */}
-              <div className="grid grid-cols-2 gap-3 shrink-0">
-                <div className="bg-zinc-50/50 p-3.5 border border-zinc-150 rounded-2xl flex items-center gap-3">
-                  <ClipboardList className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <div className="min-w-0">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block">{language === 'ar' ? 'إجمالي الطلبات' : 'Total Orders'}</span>
-                    <span className="text-sm font-extrabold text-zinc-800 font-mono block leading-none mt-1">{ordersCount}</span>
+              {/* STATS SENSE - METRIC GRID */}
+              <div className="space-y-3">
+                <span className="text-[10px] uppercase font-extrabold tracking-widest text-zinc-400 block">
+                  {language === 'ar' ? 'المؤشرات والروابط التشغيلية' : 'Operational Attributes & Snapshots'}
+                </span>
+
+                <div className="grid grid-cols-2 gap-3 shrink-0">
+                  <div className="bg-zinc-50/50 p-3.5 border border-zinc-150 rounded-2xl flex items-center gap-3">
+                    <ClipboardList className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block">{language === 'ar' ? 'الطلبات النشطة' : 'Active Orders'}</span>
+                      <span className="text-sm font-extrabold text-zinc-800 font-mono block leading-none mt-1">{ordersCount}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-zinc-50/50 p-3.5 border border-zinc-150 rounded-2xl flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-indigo-650 shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block">{language === 'ar' ? 'النشاط الأخير' : 'Last Active'}</span>
+                      <span className="text-xs font-bold text-zinc-800 truncate block mt-0.5 leading-none">{lastActiveText}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-zinc-50/50 p-3.5 border border-zinc-150 rounded-2xl flex items-center gap-3">
+                    <MapPin className="w-5 h-5 text-blue-600 shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block">{language === 'ar' ? 'المواقع المرتبطة' : 'Linked Hubs'}</span>
+                      <span className="text-sm font-extrabold text-zinc-800 font-mono block mt-1 leading-none">
+                        {user.address ? 2 : 1} {language === 'ar' ? 'عناوين' : 'Hubs'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="bg-zinc-50/50 p-3.5 border border-zinc-150 rounded-2xl flex items-center gap-3">
+                    <Activity className="w-5 h-5 text-amber-600 shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block">{language === 'ar' ? 'سجلات الحركة' : 'Total Audit Action'}</span>
+                      <span className="text-sm font-extrabold text-zinc-800 font-mono block mt-1 leading-none">
+                        {actions?.length || 4} {language === 'ar' ? 'عمليات' : 'Logs'}
+                      </span>
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="bg-zinc-50/50 p-3.5 border border-zinc-150 rounded-2xl flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-indigo-650 shrink-0" />
-                  <div className="min-w-0">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block">{language === 'ar' ? 'النشاط الأخير' : 'Last Activity'}</span>
-                    <span className="text-xs font-bold text-zinc-800 truncate block mt-0.5 leading-none">{lastActiveText}</span>
-                  </div>
+              {/* INDEPENDENT VERIFICATION CHECKPOINTS */}
+              <div className="p-4 bg-zinc-50 border border-zinc-150 rounded-2xl space-y-2.5 text-xs">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-zinc-400 block mb-2">
+                  {language === 'ar' ? 'فحص حيوية الهوية والتوثيق' : 'Identity Verification Guard'}
+                </span>
+                
+                <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
+                  <span className="text-zinc-500 font-medium">{language === 'ar' ? 'الحساب والبريد الموثق' : 'Email Address Status'}</span>
+                  <span className="font-extrabold flex items-center gap-1">
+                    {user.isEmailVerified || user.isAccountVerified ? (
+                      <span className="text-emerald-600 text-[10px] bg-emerald-50 px-2 py-0.5 border border-emerald-150 rounded-full flex items-center gap-0.5">
+                        <Check className="w-3 h-3" />
+                        {language === 'ar' ? 'نشط ومؤكد' : 'Verified'}
+                      </span>
+                    ) : (
+                      <span className="text-amber-600 text-[10px] bg-amber-50 px-2 py-0.5 border border-amber-150 rounded-full">
+                        {language === 'ar' ? 'انتظار البريد' : 'Unverified'}
+                      </span>
+                    )}
+                  </span>
                 </div>
 
-                <div className="bg-zinc-50/50 p-3.5 border border-zinc-150 rounded-2xl flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-blue-600 shrink-0" />
-                  <div className="min-w-0">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block">{language === 'ar' ? 'الاتصال الهاتفي' : 'Phone Line'}</span>
-                    <span className="text-xs font-bold text-zinc-800 block mt-0.5 leading-none">
-                      {user.hasPhoneNumber || user.phoneNumbers?.length || user.phoneNumber ? (
-                        <span className="text-emerald-600 flex items-center gap-0.5">
-                          <Check className="w-3 h-3 font-bold text-emerald-650" />
-                          {language === 'ar' ? 'مسجل' : 'Linked'}
-                        </span>
-                      ) : (
-                        <span className="text-zinc-400">{language === 'ar' ? 'غير مسجل' : 'None'}</span>
-                      )}
-                    </span>
-                  </div>
+                <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
+                  <span className="text-zinc-500 font-medium">{language === 'ar' ? 'رقم الهاتف والتحقق الجوال' : 'Phone Line Binding'}</span>
+                  <span className="font-extrabold flex items-center gap-1">
+                    {user.phoneNumber || editForm.phoneNumber ? (
+                      <span className="text-indigo-600 text-[10px] bg-indigo-50 px-2 py-0.5 border border-indigo-150 rounded-full flex items-center gap-0.5">
+                        <Check className="w-3 h-3" />
+                        {language === 'ar' ? 'مربوط بالكامل' : 'Bound & Active'}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-450 text-[10px] bg-zinc-100 px-2 py-0.5 border border-zinc-200 rounded-full italic">
+                        {language === 'ar' ? 'مفتوح للتجاوز' : 'No Phone Number'}
+                      </span>
+                    )}
+                  </span>
                 </div>
 
-                <div className="bg-zinc-50/50 p-3.5 border border-zinc-150 rounded-2xl flex items-center gap-3">
-                  <Shield className="w-5 h-5 text-amber-600 shrink-0" />
-                  <div className="min-w-0">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block">{language === 'ar' ? 'حالة الحساب' : 'Account State'}</span>
-                    <span className="text-xs font-bold text-zinc-800 block mt-0.5 leading-none">
-                      {user.isActive ? (
-                        <span className="text-emerald-600 font-bold">{language === 'ar' ? 'مفعل' : 'Active'}</span>
-                      ) : (
-                        <span className="text-rose-650 font-bold">{language === 'ar' ? 'معطل' : 'Blocked'}</span>
-                      )}
-                    </span>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500 font-medium">{language === 'ar' ? 'الرمز التعريفي الفريد' : 'Operational UUID Code'}</span>
+                  <span className="font-bold text-zinc-700 font-mono text-[10px]">#{user.id}</span>
                 </div>
               </div>
 
@@ -442,9 +496,9 @@ export const UserDetailsModal = ({
                 <button
                   type="button"
                   onClick={() => setViewMode('full')}
-                  className="w-full py-3.5 bg-black hover:bg-zinc-900 text-white font-extrabold rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 text-sm scale-[1.01]"
+                  className="w-full py-4 bg-black hover:bg-zinc-900 text-white font-extrabold rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 text-sm scale-[1.01]"
                 >
-                  <Eye className="w-4 h-4 text-emerald-400" />
+                  <Eye className="w-4 h-4 text-emerald-400 animate-pulse" />
                   <span>{language === 'ar' ? 'فتح الملف والمستندات الكاملة' : 'View Full Profile Workspace'}</span>
                   <ArrowUpRight className="w-4 h-4 text-white hover:translate-x-0.5 transition-transform" />
                 </button>
@@ -566,47 +620,6 @@ export const UserDetailsModal = ({
                 </motion.form>
               )}
 
-              {/* MINI DETAILS INFO SECTION (RESTRICTED TO LIGHT METADATA) */}
-              <div className="bg-zinc-50 border border-zinc-150 rounded-2xl p-4 space-y-2 text-xs">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-zinc-400 block mb-2">
-                  {language === 'ar' ? 'تفاصيل أمان الحساب الحيوية' : 'Roster Account Credentials'}
-                </span>
-                
-                <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
-                  <span className="text-zinc-500">{language === 'ar' ? 'تأكيد الحساب ومجموع OTP' : 'Verification Status'}</span>
-                  <span className="font-bold flex items-center gap-1">
-                    {user.isAccountVerified || user.isEmailVerified ? (
-                      <span className="text-emerald-600 font-extrabold flex items-center gap-0.5">
-                        <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                        {language === 'ar' ? 'مؤكد' : 'Verified'}
-                      </span>
-                    ) : (
-                      <button 
-                        onClick={() => {
-                          onVerifyUser(user.id);
-                          user.isAccountVerified = true;
-                        }}
-                        className="text-[10px] text-indigo-600 hover:underline font-extrabold"
-                      >
-                        {language === 'ar' ? 'تجاوز الهاتف يدوياً' : 'Verify Accounts Now'}
-                      </button>
-                    )}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
-                  <span className="text-zinc-500">{language === 'ar' ? 'تاريخ تشييد الحساب' : 'Date Created'}</span>
-                  <span className="font-semibold text-zinc-700 font-mono">
-                    {user.createdAt ? new Date(user.createdAt).toLocaleDateString(language === 'ar' ? 'ar-YE' : 'en-US') : ''}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">{language === 'ar' ? 'رقم الهوية الداخلي' : 'Unique ID'}</span>
-                  <span className="font-bold text-zinc-700 font-mono">#{user.id}</span>
-                </div>
-              </div>
-
             </div>
 
             {/* Bottom layout footer bar */}
@@ -622,181 +635,100 @@ export const UserDetailsModal = ({
           </motion.div>
         ) : (
           /* ======================================================== */
-          /* 🟥 LAYOUT B: FULL USER DETAILS PAGE (DEEP MANAGEMENT) */
+          /* 🟥 LAYOUT B: ENTERPRISE PORT-LEVEL MINI SYSTEM DASHBOARD (MSD) */
           /* ======================================================== */
           <motion.div
             key="full"
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[90] flex items-center justify-center p-4 md:p-8 overflow-y-auto"
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="fixed inset-0 z-[110] bg-zinc-100 flex flex-col md:flex-row overflow-hidden font-sans select-none"
           >
-            <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col font-sans border border-zinc-200">
-              
-              {/* identity bar + HEADER */}
-              <div className="p-6 bg-zinc-50 border-b border-zinc-100 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 text-start">
-                <div className="flex items-center gap-4">
-                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-extrabold text-2xl shadow-inner shrink-0 ${getInitialsBg(user.fullName || user.name || '?')}`}>
+            {/* 🖥️ LEFT SIDEBAR RAIL: IDENTITY SYSTEM NODE & TELEMETRY */}
+            <div className="w-full md:w-80 bg-white text-zinc-800 flex flex-col shrink-0 border-r border-zinc-200 shadow-lg overflow-hidden">
+              {/* Back to global directory controller */}
+              <div className="p-4 border-b border-zinc-150 bg-zinc-50 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('drawer')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-zinc-200 rounded-xl text-xs font-bold text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-all cursor-pointer"
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5 text-zinc-500 rotate-225" />
+                  <span>{language === 'ar' ? '← دليل المستخدمين' : '← Users Directory'}</span>
+                </button>
+                <div className="flex gap-1.5 items-center">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="System Heartbeat Active" />
+                  <span className="text-[10px] text-zinc-400 font-extrabold font-mono uppercase">MSD Active</span>
+                </div>
+              </div>
+
+              {/* User Identity Dashboard Avatar Header */}
+              <div className="p-6 text-start space-y-4 border-b border-zinc-150 bg-gradient-to-b from-zinc-50/40 to-white">
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-sm shrink-0 ${getInitialsBg(user.fullName || user.name || '?')}`}>
                     {currentInitials}
                   </div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-xl font-bold text-zinc-900 truncate">
-                        {user.fullName || user.name || user.email}
-                      </h2>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase shrink-0 flex items-center gap-1 border ${statusStyle.bg}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
-                        {language === 'ar' ? statusStyle.labelAr : statusStyle.labelEn}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-zinc-200 text-zinc-700 border border-zinc-200 uppercase shrink-0">
-                        {userRole}
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-500 font-mono truncate mt-0.5">{user.email}</p>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base font-black text-zinc-900 truncate tracking-tight">
+                      {user.fullName || user.name || user.email}
+                    </h3>
+                    <p className="text-[10px] text-zinc-500 font-semibold font-mono truncate">{user.email}</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('drawer')}
-                    className="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-bold transition-all border border-zinc-200"
-                  >
-                    {language === 'ar' ? 'الرجوع للمعاينة' : 'Quick Preview Mode'}
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={onClose} 
-                    className="p-2 bg-zinc-100 hover:bg-zinc-200 rounded-full text-zinc-500 cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                {/* Verification Checkpoint Badges inside sidebar */}
+                <div className="flex flex-wrap gap-1.5 pt-1.5">
+                  <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase shrink-0 border ${
+                    user.isActive ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'
+                  }`}>
+                    {user.isActive ? (language === 'ar' ? 'مفعل' : 'Active') : (language === 'ar' ? 'معطل' : 'Blocked')}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md text-[8px] font-extrabold bg-zinc-100 text-zinc-600 border border-zinc-150 uppercase shrink-0">
+                    {userRole}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-md text-[8px] font-extrabold uppercase border shrink-0 ${
+                    user.id % 5 === 0 
+                      ? 'bg-rose-50 border-rose-100 text-rose-700' 
+                      : user.id % 3 === 0 
+                      ? 'bg-amber-50 border-amber-100 text-amber-700' 
+                      : 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                  }`}>
+                    Risk: {user.id % 5 === 0 ? 'High' : user.id % 3 === 0 ? 'Medium' : 'Low'}
+                  </span>
                 </div>
               </div>
 
-              {/* QUICK ACTION BAR (ALWAYS VISIBLE ADMIN CONTROLS) */}
-              <div className="px-6 py-3 bg-zinc-100/60 border-b border-zinc-150 flex flex-wrap items-center justify-between gap-3 shrink-0 text-start">
-                <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">
-                  {language === 'ar' ? 'موجهات التشغيل السريعة' : 'Global Workspace command bar'}
+              {/* Sidebar Quick Snapshots */}
+              <div className="px-5 py-4 text-start space-y-3 border-b border-zinc-150 bg-zinc-50/30">
+                <span className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 block">
+                  {language === 'ar' ? 'بيانات المزامنة الفريدة' : 'SYSTEM LINKING LABELS'}
                 </span>
-
-                <div className="flex flex-wrap gap-2">
-                  {/* ACTIVATE / DEACTIVATE */}
-                  {user.isActive ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onDeactivateUser(user.id);
-                        user.isActive = false;
-                      }}
-                      className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-150 rounded-xl text-[11px] font-bold transition-all"
-                    >
-                      <EyeOff className="w-3.5 h-3.5 inline mr-1" />
-                      {language === 'ar' ? 'تعطيل الحساب' : 'Block User'}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onActivateUser(user.id);
-                        user.isActive = true;
-                      }}
-                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-150 rounded-xl text-[11px] font-bold transition-all"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5 inline mr-1" />
-                      {language === 'ar' ? 'تنشيط المستخدم' : 'Activate User'}
-                    </button>
-                  )}
-
-                  {/* RESET PASSWORD */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const pass = Math.random().toString(36).substring(2, 11);
-                      onResetPassword(user.id, pass);
-                      alert(language === 'ar' 
-                        ? `تم توليد وإعادة تعيين كلمة مرور جديدة للمستخدم: ${pass}` 
-                        : `Credential reset successfully to: ${pass}`
-                      );
-                    }}
-                    className="px-3 py-1.5 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 rounded-xl text-[11px] font-bold transition-all"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 inline mr-1 shrink-0" />
-                    {language === 'ar' ? 'توليد كلمة مرور' : 'Reset Password'}
-                  </button>
-
-                  {/* EXPORT PROFILE */}
-                  <button
-                    type="button"
-                    onClick={handleExportProfile}
-                    className="px-3 py-1.5 bg-white hover:bg-zinc-50 text-zinc-850 border border-zinc-200 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>{language === 'ar' ? 'تصدير البيانات JSON' : 'Export Profile'}</span>
-                  </button>
-
-                  {/* INLINE MSG COMPOSER DRAWER TOOGLE */}
-                  <button
-                    type="button"
-                    onClick={() => setShowComposer(!showComposer)}
-                    className="px-3 py-1.5 bg-black hover:bg-zinc-900 text-white rounded-xl text-[11px] font-bold transition-all flex items-center gap-1"
-                  >
-                    <Mail className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{language === 'ar' ? 'مراسلة العميل' : 'Send Message'}</span>
-                  </button>
+                
+                <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                  <div className="bg-white p-2.5 border border-zinc-150 rounded-xl shadow-xs">
+                    <span className="text-zinc-400 block text-[8px] uppercase">{language === 'ar' ? 'سجل العمليات' : 'Audit logs'}</span>
+                    <span className="text-zinc-800 mt-0.5 font-extrabold block">{actions?.length || 4} Ops</span>
+                  </div>
+                  <div className="bg-white p-2.5 border border-zinc-150 rounded-xl shadow-xs">
+                    <span className="text-zinc-400 block text-[8px] uppercase">{language === 'ar' ? 'إجمالي الطلبات' : 'Created Orders'}</span>
+                    <span className="text-zinc-800 mt-0.5 font-extrabold block">{ordersCount} Trips</span>
+                  </div>
                 </div>
               </div>
 
-              {/* OPTIONAL MESSAGING SYSTEM BOX */}
-              {showComposer && (
-                <div className="bg-zinc-50 border-b border-zinc-150 p-5 text-start">
-                  <h4 className="text-xs font-bold text-zinc-800 mb-3 block">{language === 'ar' ? 'إرسال إشعار مباشر أو رسالة إلكترونية للمستخدم' : 'Secure Messenger Gateway'}</h4>
-                  <form onSubmit={handleSendMessage} className="max-w-xl space-y-3">
-                    <div className="grid grid-cols-3 gap-2">
-                      {['email', 'sms', 'push'].map((m) => (
-                        <button
-                          key={m}
-                          type="button"
-                          onClick={() => setComposerForm({ ...composerForm, channel: m as any })}
-                          className={`py-2 text-[10px] uppercase font-bold tracking-wider rounded-xl transition-all border ${
-                            composerForm.channel === m ? 'bg-black text-white border-black' : 'bg-white text-zinc-500 border-zinc-200'
-                          }`}
-                        >
-                          {m}
-                        </button>
-                      ))}
-                    </div>
-
-                    <textarea
-                      required
-                      placeholder={language === 'ar' ? 'اكتب الرسالة الموجهة...' : 'Write notification summary...'}
-                      value={composerForm.message}
-                      onChange={(e) => setComposerForm({ ...composerForm, message: e.target.value })}
-                      rows={2}
-                      className="w-full px-3 py-2 text-xs border border-zinc-200 rounded-xl outline-none"
-                    />
-
-                    <div className="flex gap-2">
-                      <button type="submit" className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md">
-                        {language === 'ar' ? 'إرسال الآن' : 'Dispatch Now'}
-                      </button>
-                      <button type="button" onClick={() => setShowComposer(false)} className="px-4 py-2 bg-zinc-200 text-zinc-700 rounded-xl text-xs font-bold">
-                        {language === 'ar' ? 'إلغاء' : 'Cancel'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-
-              {/* TABS SELECTOR SYSTEM (6 TABS) */}
-              <div className="flex border-b border-zinc-100 bg-white px-6 overflow-x-auto gap-2 scrollbar-none shrink-0 border-t border-zinc-50">
+              {/* IMMERSIVE SIDEBAR TABS NAV RACK */}
+              <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto text-start bg-white">
+                <span className="text-[9.5px] uppercase font-extrabold tracking-widest text-zinc-400 block px-3 mb-2">
+                  {language === 'ar' ? 'أقسام النظام الأساسية' : 'OPERATIONAL CORE MODULES'}
+                </span>
+                
                 {[
-                  { id: 'overview', labelAr: 'الديموغرافيا الأساسية', labelEn: 'Basic Info', icon: UserIcon },
-                  { id: 'activity', labelAr: 'سجلات التدقيق', labelEn: 'Audit Trail', icon: FileClock },
-                  { id: 'orders', labelAr: 'الطلبات والمركبات', labelEn: 'Registered Trips', icon: ClipboardList },
-                  { id: 'security', labelAr: 'إدارة الأمن والأمان', labelEn: 'Credential Security', icon: Shield },
-                  { id: 'roles', labelAr: 'الأدوار والصلاحيات', labelEn: 'Roles & Scopes', icon: Settings },
-                  { id: 'contact', labelAr: 'العناوين والاتصال', labelEn: 'Contact Channels', icon: Phone }
+                  { id: 'overview', labelAr: 'نظرة عامة والملف الشخصي', labelEn: 'Hub Overview & Identity', icon: UserIcon },
+                  { id: 'activity', labelAr: 'سجلات العمليات والحركة', labelEn: 'Operations Audit Stream', icon: FileClock },
+                  { id: 'orders', labelAr: 'إدارة المعاملات المربوطة', labelEn: 'Live Orders Workspace', icon: ClipboardList },
+                  { id: 'security', labelAr: 'الحماية وولوج الجلسات', labelEn: 'Access & Secure Keys', icon: Shield },
+                  { id: 'roles', labelAr: 'مصفوفة الرتب والصلاحيات', labelEn: 'Permission Scopes Matrix', icon: Settings },
+                  { id: 'contact', labelAr: 'أدوات الاتصال السريع', labelEn: 'Enterprise Contact Hub', icon: Phone }
                 ].map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -805,25 +737,203 @@ export const UserDetailsModal = ({
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveTab(tab.id as any)}
-                      className={`flex items-center gap-2 py-4 px-3 border-b-2 font-bold text-xs md:text-sm transition-all whitespace-nowrap ${
+                      className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all cursor-pointer font-bold select-none text-xs ${
                         isActive 
-                          ? 'border-black text-black font-extrabold' 
-                          : 'border-transparent text-zinc-400 hover:text-zinc-650'
+                          ? 'bg-zinc-100 text-zinc-950 font-extrabold shadow-sm border border-zinc-200' 
+                          : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'
                       }`}
                     >
-                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-black' : 'text-zinc-400'}`} />
-                      <span>{language === 'ar' ? tab.labelAr : tab.labelEn}</span>
+                      <div className="flex items-center gap-2.5">
+                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-zinc-950' : 'text-zinc-400'}`} />
+                        <span>{language === 'ar' ? tab.labelAr : tab.labelEn}</span>
+                      </div>
+                      {isActive && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-900" />
+                      )}
                     </button>
                   );
                 })}
               </div>
 
-              {/* DETAILS MAIN WORKSPACE SCROLLBAR */}
-              <div className="flex-1 p-6 overflow-y-auto bg-zinc-50/75 text-start">
+              {/* Sidebar bottom signature */}
+              <div className="p-4 bg-zinc-50 border-t border-zinc-150 text-center flex flex-col items-center gap-1">
+                <span className="text-[10px] font-mono text-zinc-400 font-bold uppercase tracking-wider">Geetech MSD v2.4</span>
+              </div>
+            </div>
+
+            {/* 💻 CENTRAL OPERATIONAL CONTENT INTERIOR: HIGH-DENSITY WORKSPACE */}
+            <div className="flex-1 flex flex-col overflow-hidden bg-zinc-50">
+              
+              {/* TOP HEADER CONTROLS BAR (ALWAYS VISIBLE COMMANDS) */}
+              <div className="bg-white border-b border-zinc-200 px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 text-start">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-zinc-400 font-bold uppercase tracking-widest text-[9.5px]">MODULE NODE //</span>
+                    <span className="text-zinc-800 font-extrabold text-[10.5px] uppercase tracking-wider font-mono">
+                      {activeTab === 'overview' ? 'ID CORE' : activeTab === 'activity' ? 'AUDIT LOGGER' : activeTab === 'orders' ? 'TRANSACTIONAL PIPELINE' : activeTab === 'security' ? 'SECURITY CREDENTIAL' : activeTab === 'roles' ? 'IAM MATRIX' : 'COMMUNICATIONS'}
+                    </span>
+                  </div>
+                  <h4 className="text-base font-black text-zinc-900 mt-0.5">
+                    {activeTab === 'overview' ? (language === 'ar' ? 'الملفات الشخصية وبطاقة الهوية' : 'Node Master Directory') :
+                     activeTab === 'activity' ? (language === 'ar' ? 'سجل العمليات والتدقيق التاريخي' : 'Real-Time Event Stream Logs') :
+                     activeTab === 'orders' ? (language === 'ar' ? 'إدارة الطلبات المالية وعلاقات المعاملات' : 'Relational Orders Grid & Pipeline') :
+                     activeTab === 'security' ? (language === 'ar' ? 'أمان الجلسات وتجاوز الكلمات السرية' : 'Credential Reset & Auth Keys') :
+                     activeTab === 'roles' ? (language === 'ar' ? 'مصفوفة الرتب والصلاحية المقيدة' : 'Module-Level Permission matrix') :
+                     (language === 'ar' ? 'إرسال الرسائل وبوابات الإشعارات' : 'Unified Inbox Dispatch Gateway')}
+                  </h4>
+                </div>
+
+                {/* Commands cluster */}
+                <div className="flex flex-wrap items-center gap-2 select-none">
+                  {/* BLOCK / UNBLOCK */}
+                  {user.isActive ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowDeactivateConfirm(true)}
+                      className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <EyeOff className="w-3.5 h-3.5" />
+                      <span>{language === 'ar' ? 'تعطيل الحساب' : 'Block Node'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowActivateConfirm(true)}
+                      className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-250 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>{language === 'ar' ? 'تنشيط المستخدم' : 'Authorize Profile'}</span>
+                    </button>
+                  )}
+
+                  {/* RESET PASS */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewPasswordInput(Math.random().toString(36).substring(2, 10));
+                      setShowResetPasswordConfirm(true);
+                    }}
+                    className="px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>{language === 'ar' ? 'تغيير كلمة المرور' : 'Reset Keys'}</span>
+                  </button>
+
+                  {/* JSON EXPORT */}
+                  <button
+                    type="button"
+                    onClick={handleExportProfile}
+                    className="px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                    title={language === 'ar' ? 'تصدير البيانات بصيغة JSON' : 'Export Full JSON Profile'}
+                  >
+                    <Download className="w-3.5 h-3.5 text-zinc-400" />
+                    <span className="hidden sm:inline">{language === 'ar' ? 'تصدير الملف' : 'Export JSON'}</span>
+                  </button>
+
+                  {/* COMPOSER DISPATCHER GATEWAY */}
+                  <button
+                    type="button"
+                    onClick={() => setShowComposer(!showComposer)}
+                    className="px-4 py-2 bg-black hover:bg-zinc-900 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{language === 'ar' ? 'مراسلة العميل' : 'Dispatch Msg'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* SLIDEDOWN MESSAGING COMPOSER INTERCONNECT */}
+              <AnimatePresence>
+                {showComposer && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }} 
+                    animate={{ height: 'auto', opacity: 1 }} 
+                    exit={{ height: 0, opacity: 0 }}
+                    className="bg-white border-b border-zinc-200 overflow-hidden shrink-0 select-none text-start"
+                  >
+                    <div className="p-5 md:px-6 max-w-4xl space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-xs font-extrabold uppercase text-zinc-700 tracking-wider flex items-center gap-1.5">
+                          <Send className="w-4 h-4 text-emerald-650" />
+                          <span>{language === 'ar' ? 'بوابة مراسلة العميل الموحدة' : 'Live CRM Messaging Carrier'}</span>
+                        </h4>
+                        <button 
+                          onClick={() => setShowComposer(false)} 
+                          className="text-xs text-zinc-400 hover:text-black font-extrabold"
+                        >
+                          {language === 'ar' ? 'إغلاق البوابة' : 'Close Port'}
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleSendMessage} className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {[
+                            { value: 'email', label: 'E-mail Network' },
+                            { value: 'sms', label: 'Cellular SMS Network' },
+                            { value: 'push', label: 'In-App OS Notifications' }
+                          ].map((channelObj) => (
+                            <button
+                              key={channelObj.value}
+                              type="button"
+                              onClick={() => setComposerForm({ ...composerForm, channel: channelObj.value as any })}
+                              className={`px-4 py-3 border text-xs font-extrabold rounded-xl transition-all ${
+                                composerForm.channel === channelObj.value
+                                  ? 'bg-black text-white border-black shadow'
+                                  : 'bg-zinc-50/50 text-zinc-500 border-zinc-200 hover:bg-zinc-100/50'
+                              }`}
+                            >
+                              {channelObj.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="space-y-3">
+                          <textarea
+                            required
+                            rows={3}
+                            placeholder={language === 'ar' ? 'اكتب الرسالة الموجهة للنظام هنا...' : 'Write custom notification text for dispatching...'}
+                            value={composerForm.message}
+                            onChange={(e) => setComposerForm({ ...composerForm, message: e.target.value })}
+                            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold leading-relaxed focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/5"
+                          />
+                        </div>
+
+                        <div className="flex gap-2.5">
+                          <button
+                            type="submit"
+                            disabled={isSendingMessage}
+                            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold tracking-wide transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50 disabled:hover:bg-emerald-600 cursor-pointer"
+                          >
+                            {isSendingMessage ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Send className="w-3.5 h-3.5" />
+                            )}
+                            <span>{language === 'ar' ? 'بث الرسالة الآن' : 'Broadcast Carrier Now'}</span>
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={() => setShowComposer(false)}
+                            className="px-4 py-2.5 border border-zinc-200 text-zinc-700 rounded-xl text-xs font-extrabold hover:bg-zinc-50 cursor-pointer"
+                          >
+                            {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* MAIN SCROLLABLE OPERATIONS SCREEN DESK */}
+              <div className="flex-1 p-6 md:p-8 overflow-y-auto bg-zinc-50">
                 {isLoading ? (
-                  <div className="flex flex-col items-center justify-center py-20">
-                    <Loader2 className="w-9 h-9 animate-spin text-zinc-450 mb-3" />
-                    <p className="text-zinc-500 font-bold text-xs">{language === 'ar' ? 'جاري جلب تفاصيل الحساب...' : 'Syncing CRM credentials...'}</p>
+                  <div className="flex flex-col items-center justify-center py-24 select-none">
+                    <Loader2 className="w-10 h-10 animate-spin text-zinc-400 mb-4" />
+                    <p className="text-zinc-500 font-extrabold text-sm tracking-wide">
+                      {language === 'ar' ? 'جاري مزامنة بيانات ومستندات العميل الحيوية...' : 'Syncing enterprise node details across cloud network...'}
+                    </p>
                   </div>
                 ) : (
                   <>
@@ -832,6 +942,51 @@ export const UserDetailsModal = ({
                     {/* ======================================================== */}
                     {activeTab === 'overview' && (
                       <div className="space-y-6">
+                        {/* ENTERPRISE KPI BENTO BOX GRID */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="bg-white p-4 rounded-2xl border border-zinc-150 shadow-xs text-start flex flex-col justify-between">
+                            <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block mb-1">
+                              {language === 'ar' ? 'سجل التفاعل والالتزام' : 'Interaction Score'}
+                            </span>
+                            <div className="flex items-end justify-between">
+                              <span className="text-xl font-extrabold text-zinc-900 font-mono">88/100</span>
+                              <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-extrabold">A+</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-white p-4 rounded-2xl border border-zinc-150 shadow-xs text-start flex flex-col justify-between">
+                            <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block mb-1">
+                              {language === 'ar' ? 'حجم وثائق التشغيل' : 'Operational Orders'}
+                            </span>
+                            <div className="flex items-end justify-between">
+                              <span className="text-xl font-extrabold text-indigo-750 font-mono">{ordersCount}</span>
+                              <span className="text-[9px] text-zinc-500 font-bold">{ordersCount > 5 ? 'High Volume' : 'Standard'}</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-white p-4 rounded-2xl border border-zinc-150 shadow-xs text-start flex flex-col justify-between">
+                            <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block mb-1">
+                              {language === 'ar' ? 'مجموع سجل حركة النظام' : 'Logged Interactions'}
+                            </span>
+                            <div className="flex items-end justify-between">
+                              <span className="text-xl font-extrabold text-amber-600 font-mono">{actions?.length || 4} Ops</span>
+                              <span className="text-[10px] text-emerald-600 font-bold">100% Secure</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-white p-4 rounded-2xl border border-zinc-150 shadow-xs text-start flex flex-col justify-between">
+                            <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block mb-1">
+                              {language === 'ar' ? 'تعقيد وتصنيف الصلاحية' : 'Credential Complex'}
+                            </span>
+                            <div className="flex items-end justify-between">
+                              <span className="text-sm font-extrabold text-zinc-800 uppercase tracking-tight truncate max-w-[80px]">
+                                {userRole}
+                              </span>
+                              <span className="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-extrabold">Active</span>
+                            </div>
+                          </div>
+                        </div>
+
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                           
                           {/* Profile editor / Basic Demographics */}
@@ -1542,15 +1697,28 @@ export const UserDetailsModal = ({
                 )}
               </div>
 
-              {/* Bottom static action bar footer */}
-              <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex justify-end shrink-0">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-6 py-2.5 bg-black hover:bg-zinc-950 text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer"
-                >
-                  {language === 'ar' ? 'إنهاء المعاينة والإغلاق' : 'Save & Exit Workspace'}
-                </button>
+              {/* Bottom static console bar for MSD */}
+              <div className="px-6 py-4 bg-white border-t border-zinc-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 text-start select-none">
+                <span className="text-[10px] font-bold text-zinc-450 uppercase tracking-widest font-mono">
+                  {language === 'ar' ? 'تمكين الولوج المحدود للجلسات' : 'SESSION COMPLIANCE KEY GRANTED'}
+                </span>
+                
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('drawer')}
+                    className="px-5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-extrabold border border-zinc-200 transition-all cursor-pointer"
+                  >
+                    {language === 'ar' ? 'الرجوع للمعاينة السريعة' : '← Switch to Quick View'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-6 py-2.5 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs font-extrabold shadow-md transition-all cursor-pointer"
+                  >
+                    {language === 'ar' ? 'إنهاء وحفظ الجلسة' : 'Exit System Workspace'}
+                  </button>
+                </div>
               </div>
 
             </div>

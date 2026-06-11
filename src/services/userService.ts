@@ -179,3 +179,14 @@ export const verifyUserAccount = async (id: number): Promise<any> => {
 export const changePassword = async (confirmedPassword: string, newPassword: string): Promise<any> => {
   return apiClient.post(`Profile/change-password`, { confirmedPassword, newPassword });
 };
+
+export const uploadProfileImage = async (file: File): Promise<any> => {
+  const formData = new FormData();
+  formData.append("File", file);
+  return apiClient.post(`Profile/image`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+      "Accept": "*/*",
+    },
+  });
+};

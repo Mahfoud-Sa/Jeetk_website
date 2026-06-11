@@ -6,7 +6,8 @@ import {
   Search, 
   CheckCircle2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Sparkles,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useToast } from '../../context/ToastContext';
@@ -16,11 +17,29 @@ import { CreateOrderRequest } from '../../types';
 import { OrderManagement } from './OrderManagement';
 import { UserProfile } from '../UserProfile';
 
-export const DeliveryDashboard = ({ userId }: { userId: number | null }) => {
+interface DeliveryDashboardProps {
+  userId: number | null;
+  isCollapsed?: boolean;
+  setIsCollapsed?: (val: boolean) => void;
+  isWorkspaceFullScreen?: boolean;
+  setIsWorkspaceFullScreen?: (enable: boolean) => void;
+}
+
+export const DeliveryDashboard = ({ 
+  userId,
+  isCollapsed: controlledCollapsed,
+  setIsCollapsed: setControlledCollapsed,
+  isWorkspaceFullScreen = false,
+  setIsWorkspaceFullScreen,
+}: DeliveryDashboardProps) => {
   const { t, language } = useLanguage();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'profile'>('overview');
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  const [localCollapsed, setLocalCollapsed] = useState(false);
+  const isCollapsed = controlledCollapsed !== undefined ? controlledCollapsed : localCollapsed;
+  const setIsCollapsed = setControlledCollapsed !== undefined ? setControlledCollapsed : setLocalCollapsed;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | 'all'>('all');
 
@@ -62,57 +81,103 @@ export const DeliveryDashboard = ({ userId }: { userId: number | null }) => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-8">
-      <div className={`w-full ${isCollapsed ? 'md:w-20' : 'md:w-64'} shrink-0 flex flex-col gap-2 transition-all duration-300`}>
-        <div className={`p-4 mb-4 bg-primary/10 rounded-2xl flex items-center transition-all duration-300 ${isCollapsed ? 'md:justify-center' : ''}`}>
-          <h2 className="font-bold text-primary flex items-center gap-2 overflow-hidden truncate">
-            <LayoutDashboard className="w-5 h-5 shrink-0" />
+    <div className={`flex flex-col md:flex-row ${isWorkspaceFullScreen ? 'gap-0 min-h-screen bg-white rounded-3xl overflow-hidden' : 'gap-8'}`}>
+      {/* Sidebar - Hidden completely in Workspace Full Screen mode */}
+      {!isWorkspaceFullScreen && (
+        <div className={`w-full ${isCollapsed ? 'md:w-[72px]' : 'md:w-64'} shrink-0 flex flex-col gap-2.5 transition-all duration-300`}>
+        <div className={`p-4 mb-2 bg-primary/10 rounded-2xl flex items-center transition-all duration-300 ${isCollapsed ? 'md:justify-center' : ''}`}>
+          <h2 className="font-extrabold text-primary flex items-center gap-2.5 overflow-hidden truncate">
+            <LayoutDashboard className="w-6 h-6 shrink-0" />
             <span className={`${isCollapsed ? 'md:hidden' : 'inline'} transition-all duration-300`}>
               {t.dashboard.deliveryTitle}
             </span>
           </h2>
         </div>
-        <button 
-          onClick={() => setActiveTab('overview')}
-          className={`flex items-center transition-all duration-300 ${isCollapsed ? 'md:justify-center md:px-0' : 'gap-3 px-4 py-3'} rounded-xl text-sm font-medium ${activeTab === 'overview' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
-          title={isCollapsed ? t.dashboard.overview : ''}
-        >
-          <LayoutDashboard className="w-4 h-4 shrink-0" /> 
-          <span className={`${isCollapsed ? 'md:hidden' : 'inline'} transition-all duration-300`}>{t.dashboard.overview}</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('orders')}
-          className={`flex items-center transition-all duration-300 ${isCollapsed ? 'md:justify-center md:px-0' : 'gap-3 px-4 py-3'} rounded-xl text-sm font-medium ${activeTab === 'orders' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
-          title={isCollapsed ? t.dashboard.orders : ''}
-        >
-          <ShoppingBag className="w-4 h-4 shrink-0" /> 
-          <span className={`${isCollapsed ? 'md:hidden' : 'inline'} transition-all duration-300`}>{t.dashboard.orders}</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('profile')}
-          className={`flex items-center transition-all duration-300 ${isCollapsed ? 'md:justify-center md:px-0' : 'gap-3 px-4 py-3'} rounded-xl text-sm font-medium ${activeTab === 'profile' ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'}`}
-          title={isCollapsed ? (language === 'ar' ? 'الملف الشخصي' : 'Profile') : ''}
-        >
-          <UserIcon className="w-4 h-4 shrink-0" /> 
-          <span className={`${isCollapsed ? 'md:hidden' : 'inline'} transition-all duration-300`}>{language === 'ar' ? 'الملف الشخصي' : 'Profile'}</span>
-        </button>
+
+        {isCollapsed ? (
+          /* Collapsed State: Standard centered 24px icons and 56px hitboxes */
+          <div className="hidden md:flex flex-col items-center gap-2">
+            {[
+              { id: 'overview', label: t.dashboard.overview, icon: LayoutDashboard },
+              { id: 'orders', label: t.dashboard.orders, icon: ShoppingBag },
+              { id: 'profile', label: language === 'ar' ? 'الملف الشخصي' : 'Profile', icon: UserIcon },
+            ].map(item => {
+              const isActive = activeTab === item.id;
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id as any)}
+                  className={`w-14 h-14 flex items-center justify-center rounded-xl transition-all duration-200 ${
+                    isActive 
+                      ? 'bg-black text-white shadow-sm scale-102' 
+                      : 'hover:bg-zinc-100 text-zinc-600'
+                  }`}
+                  title={item.label}
+                >
+                  <Icon className="w-6 h-6 shrink-0" />
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          /* Expanded State: Left-aligned with comfortable padding and 24px icons */
+          <div className="flex flex-col gap-2">
+            {[
+              { id: 'overview', label: t.dashboard.overview, icon: LayoutDashboard },
+              { id: 'orders', label: t.dashboard.orders, icon: ShoppingBag },
+              { id: 'profile', label: language === 'ar' ? 'الملف الشخصي' : 'Profile', icon: UserIcon },
+            ].map(item => {
+              const isActive = activeTab === item.id;
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id as any)}
+                  className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                    isActive ? 'bg-black text-white' : 'hover:bg-zinc-100 text-zinc-600'
+                  }`}
+                >
+                  <Icon className="w-6 h-6 shrink-0" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Dynamic Collapse/Expand Toggle button (Sticky bottom in sidebar) */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="hidden md:flex items-center transition-all duration-300 px-4 py-3 rounded-xl text-sm font-medium hover:bg-zinc-100 text-zinc-500 mt-auto border border-dashed border-zinc-200 hover:border-zinc-300 justify-center"
+          className="hidden md:flex items-center transition-all duration-300 px-4 py-3.5 rounded-xl text-sm font-medium hover:bg-zinc-100 text-zinc-500 mt-auto border border-dashed border-zinc-250 hover:border-zinc-350 justify-center"
           title={language === 'ar' ? (isCollapsed ? 'توسيع القائمة' : 'طي القائمة') : (isCollapsed ? 'Expand Menu' : 'Collapse Menu')}
         >
           {isCollapsed ? (
-            language === 'ar' ? <ChevronLeft className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />
+            language === 'ar' ? <ChevronLeft className="w-5 h-5 shrink-0" /> : <ChevronRight className="w-5 h-5 shrink-0" />
           ) : (
-            language === 'ar' ? <ChevronRight className="w-4 h-4 shrink-0" /> : <ChevronLeft className="w-4 h-4 shrink-0" />
+            language === 'ar' ? <ChevronRight className="w-5 h-5 shrink-0" /> : <ChevronLeft className="w-5 h-5 shrink-0" />
           )}
-          {!isCollapsed && <span className="ml-2 rtl:mr-2 rtl:ml-0">{language === 'ar' ? 'طي القائمة' : 'Collapse Menu'}</span>}
+          {!isCollapsed && <span className="ml-2 rtl:mr-2 rtl:ml-0 text-xs font-bold leading-none">{language === 'ar' ? 'طي القائمة' : 'Collapse Menu'}</span>}
         </button>
       </div>
+      )}
 
-      <div className="flex-1">
+      <div className={`flex-1 ${isWorkspaceFullScreen ? 'p-6 sm:p-8 min-h-screen bg-white overflow-auto' : ''}`}>
+        
+        {/* Workspace Focus Mode Trigger */}
+        {!isWorkspaceFullScreen && activeTab === 'overview' && setIsWorkspaceFullScreen && (
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={() => setIsWorkspaceFullScreen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-zinc-900 to-black hover:from-black hover:to-zinc-900 text-white shadow-md hover:shadow-lg rounded-xl text-xs font-bold transition-all duration-300 cursor-pointer active:scale-95 flex-row shrink-0"
+              title={language === 'ar' ? 'تفعيل وضع التركيز (ملء الشاشة)' : 'Enter Focus Mode (Full Screen)'}
+              aria-label="Enter Focus Mode"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span>{language === 'ar' ? 'بدء وضع التركيز' : 'Workspace Focus Mode'}</span>
+            </button>
+          </div>
+        )}
         {activeTab === 'overview' && (
           <div className="space-y-8">
             <h1 className="text-3xl font-bold">{t.dashboard.deliveryTitle}</h1>

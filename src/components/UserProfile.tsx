@@ -1,7 +1,7 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, PhoneNumber } from '../types';
-import { useUser, updateUser, changePassword } from '../services/userService';
+import { useUser, updateUser, changePassword, uploadProfileImage } from '../services/userService';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -21,7 +21,8 @@ import {
   X,
   RefreshCw,
   AlertCircle,
-  Clock
+  Clock,
+  Camera
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { fetchWorkingDays, createWorkingDay, deleteWorkingDay, WorkingDay } from '../services/workingDaysService';
@@ -45,7 +46,48 @@ export const UserProfile = ({ userId }: { userId: number }) => {
   
   const [formData, setFormData] = useState<Partial<User>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'info' | 'security' | 'schedule'>('info');
+
+  const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast(
+        language === 'ar' ? 'يرجى اختيار ملف صورة صالح' : 'Please select a valid image file',
+        'error'
+      );
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast(
+        language === 'ar' ? 'حجم الصورة كبير جداً (الحد الأقصى 5 ميغابايت)' : 'Image size is too large (maximum 5MB)',
+        'error'
+      );
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      await uploadProfileImage(file);
+      showToast(
+        language === 'ar' ? 'تم تحديث صورة الملف الشخصي بنجاح!' : 'Profile picture updated successfully!',
+        'success'
+      );
+      refetch();
+    } catch (err: any) {
+      console.error("Upload failed", err);
+      showToast(
+        err?.response?.data?.message || err?.message ||
+        (language === 'ar' ? 'فشل تحميل صورة الملف الشخصي' : 'Failed to upload profile picture'),
+        'error'
+      );
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   // Change password states
   const [newPassword, setNewPassword] = useState('');
@@ -247,8 +289,39 @@ export const UserProfile = ({ userId }: { userId: number }) => {
         {/* Header Section */}
         <div className="bg-zinc-50 px-8 py-10 border-b border-zinc-100">
           <div className="flex flex-col md:flex-row items-center gap-6">
-            <div className="w-24 h-24 bg-primary/10 rounded-3xl flex items-center justify-center border-4 border-white shadow-sm">
-              <UserIcon className="w-10 h-10 text-primary" />
+            <div className="relative group w-24 h-24 border-4 border-white shadow-md rounded-3xl bg-zinc-100 flex items-center justify-center overflow-hidden shrink-0 transition-transform duration-300 hover:scale-105">
+              {isUploadingImage && (
+                <div className="absolute inset-0 bg-black/55 flex items-center justify-center z-10">
+                  <Loader2 className="w-6 h-6 animate-spin text-white" />
+                </div>
+              )}
+              <img 
+                src={user.profilePictureUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=256&h=256&fit=crop&auto=format&q=80"} 
+                alt={user.name} 
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=256&h=256&fit=crop&auto=format&q=80";
+                }}
+              />
+              
+              {/* Camera Hover overlay */}
+              <label 
+                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-white gap-1 select-none"
+                title={language === 'ar' ? 'تغيير الصورة الشخصية' : 'Change profile picture'}
+              >
+                <Camera className="w-5 h-5" />
+                <span className="text-[10px] font-bold tracking-tight">
+                  {language === 'ar' ? 'تحميل' : 'Upload'}
+                </span>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleImageChange}
+                  disabled={isUploadingImage}
+                />
+              </label>
             </div>
             <div className="text-center md:text-start flex-1">
               <div className="flex items-center justify-center md:justify-start gap-3 mb-1">

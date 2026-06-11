@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Globe, Search, ShoppingBag, LogIn, LayoutDashboard } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -10,6 +11,24 @@ export const Navbar = ({ cartCount }: {
 }) => {
   const { language, setLanguage, t } = useLanguage();
   const { isAuthenticated } = useAuth();
+  const [deliverAddress, setDeliverAddress] = useState<string>('');
+
+  useEffect(() => {
+    fetch('https://jeetk-api.runasp.net/api/WebsiteContent/path')
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch path');
+        return res.json();
+      })
+      .then(data => {
+        if (data && data.title) {
+          const prefix = language === 'ar' ? 'التوصيل إلى: ' : 'Deliver to: ';
+          setDeliverAddress(`${prefix}${data.title}`);
+        }
+      })
+      .catch(err => {
+        console.error('Navbar path fetch error:', err);
+      });
+  }, [language]);
   
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-black/5">
@@ -20,8 +39,8 @@ export const Navbar = ({ cartCount }: {
         </Link>
         
         <div className="hidden md:flex items-center gap-2 bg-zinc-100 px-3 py-1.5 rounded-full text-sm font-medium">
-          <MapPin className="w-4 h-4" />
-          <span>{t.nav.deliverTo}</span>
+          <MapPin className="w-4 h-4 text-primary" />
+          <span>{deliverAddress || t.nav.deliverTo}</span>
         </div>
 
         <div className="flex items-center gap-4">

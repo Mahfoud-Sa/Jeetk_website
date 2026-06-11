@@ -575,22 +575,15 @@ export const AdminUsers = () => {
                       {/* Column 1: Identity (Avatar) */}
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center">
-                          {hasPic ? (
-                            <img 
-                              referrerPolicy="no-referrer"
-                              src={user.profilePictureUrl || ''} 
-                              alt={user.fullName || user.name}
-                              className="w-10 h-10 rounded-xl object-cover shrink-0 border border-zinc-150 shadow-inner"
-                              onError={(e) => {
-                                // hide image error seamlessly
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                          ) : (
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-sm shadow-inner shrink-0 leading-none ${getInitialsBg(user.fullName || user.name || '?')}`}>
-                              {user.fullName ? user.fullName.charAt(0).toUpperCase() : (user.name ? user.name.charAt(0).toUpperCase() : '?')}
-                            </div>
-                          )}
+                          <img 
+                            referrerPolicy="no-referrer"
+                            src={user.profilePictureUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&auto=format&q=80'} 
+                            alt={user.fullName || user.name}
+                            className="w-10 h-10 rounded-xl object-cover shrink-0 border border-zinc-150 shadow-inner"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&auto=format&q=80';
+                            }}
+                          />
                         </div>
                       </td>
 
