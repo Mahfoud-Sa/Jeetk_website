@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   X, ShieldCheck, User as UserIcon, Phone, Calendar, ClipboardList, 
   FileClock, Shield, Key, Activity, Clock, CheckCircle2, EyeOff, RefreshCw, Plus, Loader2,
@@ -98,6 +99,7 @@ export const UserDetailsModal = ({
   onCreateWorkingDay,
   defaultTab = 'overview'
 }: UserDetailsModalProps) => {
+  const navigate = useNavigate();
   // Dual layout mode: 'drawer' (default Quick View) -> 'full' (Deep Management)
   const [viewMode, setViewMode] = useState<'drawer' | 'full'>('drawer');
   
@@ -495,11 +497,14 @@ export const UserDetailsModal = ({
                 {/* VIEW FULL DETAILS PRIMARY ENTRY POINT */}
                 <button
                   type="button"
-                  onClick={() => setViewMode('full')}
+                  onClick={() => {
+                    onClose();
+                    navigate(`/فتح الملف والمستندات?id=${user?.id || ''}`);
+                  }}
                   className="w-full py-4 bg-black hover:bg-zinc-900 text-white font-extrabold rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 text-sm scale-[1.01]"
                 >
                   <Eye className="w-4 h-4 text-emerald-400 animate-pulse" />
-                  <span>{language === 'ar' ? 'فتح الملف والمستندات الكاملة' : 'View Full Profile Workspace'}</span>
+                  <span>{language === 'ar' ? 'عرض التفاصيل' : 'View Full Profile Workspace'}</span>
                   <ArrowUpRight className="w-4 h-4 text-white hover:translate-x-0.5 transition-transform" />
                 </button>
 

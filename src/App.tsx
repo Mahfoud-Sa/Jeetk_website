@@ -30,6 +30,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { UserMinimumDashboardPage } from './pages/UserMinimumDashboardPage';
 
 function AppContent() {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -123,6 +124,11 @@ function AppContent() {
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/فتح الملف والمستندات" element={
+              <ProtectedRoute>
+                <UserMinimumDashboardPage />
               </ProtectedRoute>
             } />
           </Routes>

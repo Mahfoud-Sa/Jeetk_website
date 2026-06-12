@@ -1,4 +1,5 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Search, Eye, Edit, Trash2, X, CheckCircle2, Truck, UserPlus, User as UserIcon, EyeOff,
   Calendar, Clock, Plus, Loader2, RefreshCw, ShieldCheck,
@@ -30,6 +31,7 @@ const DAYS_OF_WEEK = [
 ];
 
 export const AdminUsers = () => {
+  const navigate = useNavigate();
   const { t, language } = useLanguage();
   const { showToast } = useToast();
   
@@ -718,17 +720,17 @@ export const AdminUsers = () => {
                                       onClick={() => { setViewModalDefaultTab('overview'); openViewUser(user); }}
                                       className="w-full px-4 py-2.5 hover:bg-zinc-50 text-xs font-bold text-zinc-800 flex items-center gap-2 text-start"
                                     >
-                                      <UserIcon className="w-3.5 h-3.5 text-zinc-400" />
-                                      <span>{language === 'ar' ? 'عرض التفاصيل والملفات' : 'View Full Details'}</span>
+                                      <Eye className="w-3.5 h-3.5 text-zinc-400" />
+                                      <span>{language === 'ar' ? 'لمحه' : 'Quick View'}</span>
                                     </button>
 
                                     <button
                                       type="button"
-                                      onClick={() => { setViewModalDefaultTab('activity'); openViewUser(user); }}
+                                      onClick={() => navigate(`/فتح الملف والمستندات?id=${user.id}`)}
                                       className="w-full px-4 py-2.5 hover:bg-zinc-50 text-xs font-bold text-zinc-800 flex items-center gap-2 text-start"
                                     >
-                                      <FileClock className="w-3.5 h-3.5 text-zinc-400" />
-                                      <span>{language === 'ar' ? 'متابعة سجل العمليات' : 'View Activity Log'}</span>
+                                      <ClipboardList className="w-3.5 h-3.5 text-indigo-500" />
+                                      <span>{language === 'ar' ? 'عرض التفاصيل' : 'View Full Details'}</span>
                                     </button>
 
                                     {rolesList.includes('delivery') && (
