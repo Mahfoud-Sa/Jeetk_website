@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Database, 
@@ -49,7 +50,16 @@ export const AdminDashboard = ({
   setIsWorkspaceFullScreen,
 }: AdminDashboardProps) => {
   const { t, language } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  
   const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'restaurants' | 'routes' | 'users' | 'users-roles' | 'users-permissions' | 'orders' | 'profile' | 'history' | 'features'>('overview');
+
+  useEffect(() => {
+    if (tabParam && ['overview', 'locations', 'restaurants', 'routes', 'users', 'users-roles', 'users-permissions', 'orders', 'profile', 'history', 'features'].includes(tabParam)) {
+      setActiveTab(tabParam as any);
+    }
+  }, [tabParam]);
   
   const [localCollapsed, setLocalCollapsed] = useState(false);
   const isCollapsed = controlledCollapsed !== undefined ? controlledCollapsed : localCollapsed;

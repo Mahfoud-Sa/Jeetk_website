@@ -58,8 +58,14 @@ export interface Order {
   DeliveryPrice?: number;
   description: string;
   Description?: string;
+  customerName?: string;
+  CustomerName?: string;
+  customerPhone?: string;
+  CustomerPhone?: string;
   deliveryLocationDescription: string;
   DeliveryLocationDescription?: string;
+  locationNote?: string;
+  LocationNote?: string;
   orderState: string;
   OrderState?: string;
   receptionDescription: string;
@@ -74,6 +80,28 @@ export interface Order {
   CreatedAt?: string;
   updatedAt?: string;
   UpdatedAt?: string;
+  items?: {
+    name: string;
+    source: string;
+    unitPrice: number;
+    quantity: number;
+  }[];
+  Items?: {
+    name: string;
+    source: string;
+    unitPrice: number;
+    quantity: number;
+  }[];
+  attachments?: {
+    fileUrl: string;
+    fileType: number;
+    description: string;
+  }[];
+  Attachments?: {
+    fileUrl: string;
+    fileType: number;
+    description: string;
+  }[];
 }
 
 export type ActionType = 'Create' | 'Update' | 'Delete';
@@ -92,12 +120,26 @@ export interface ActionEntity {
 
 export interface CreateOrderRequest {
   deliveryPrice: number;
-  description: string;
+  description?: string;
+  customerName?: string;
+  customerPhone?: string;
   deliveryLocationDescription: string;
-  orderState: string;
+  locationNote?: string;
   receptionDescription: string;
   deliveryUserId: number;
   deliveryTime: string;
+  orderState?: string;
+  items?: {
+    name: string;
+    source: string;
+    unitPrice: number;
+    quantity: number;
+  }[];
+  attachments?: {
+    fileUrl: string;
+    fileType: number;
+    description: string;
+  }[];
 }
 
 export interface PhoneNumber {

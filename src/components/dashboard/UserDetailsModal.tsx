@@ -9,6 +9,32 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { updateUser } from '../../services/userService';
 
+const parseOrderDescription = (descString: string) => {
+  try {
+    const parsed = JSON.parse(descString);
+    if (parsed && typeof parsed === 'object') {
+      return {
+        text: parsed.text || '',
+        items: Array.isArray(parsed.items) ? parsed.items : [],
+        invoiceImages: Array.isArray(parsed.invoiceImages) ? parsed.invoiceImages : [],
+        customerName: parsed.customerName || '',
+        customerPhone: parsed.customerPhone || '',
+        customerEmail: parsed.customerEmail || ''
+      };
+    }
+  } catch (e) {
+    // Normal string
+  }
+  return {
+    text: descString || '',
+    items: [],
+    invoiceImages: [],
+    customerName: '',
+    customerPhone: '',
+    customerEmail: ''
+  };
+};
+
 const DAYS_OF_WEEK = [
   { value: 0, labelEn: 'Sunday', labelAr: 'الأحد' },
   { value: 1, labelEn: 'Monday', labelAr: 'الإثنين' },
@@ -1429,10 +1455,63 @@ export const UserDetailsModal = ({
                                     const priceVal = order.deliveryPrice || order.DeliveryPrice || 0;
                                     const stateVal = order.orderState || order.OrderState || 'Pending';
 
+                                    const parsedDesc = parseOrderDescription(descVal);
+
                                     return (
                                       <tr key={idVal} className="hover:bg-zinc-50/50 transition-all">
                                         <td className="px-5 py-4 font-mono font-bold text-zinc-900">#{idVal}</td>
-                                        <td className="px-5 py-4 font-extrabold max-w-xs truncate">{descVal}</td>
+                                        <td className="px-5 py-4 max-w-xs text-start">
+                                          <div className="flex flex-col gap-1">
+                                            {parsedDesc.text && (
+                                              <span className="font-extrabold text-zinc-805 block">{parsedDesc.text}</span>
+                                            )}
+                                            {parsedDesc.items && parsedDesc.items.length > 0 && (
+                                              <div className="flex flex-wrap gap-1 mt-1">
+                                                {parsedDesc.items.map((item: any, i: number) => (
+                                                  <span key={i} className="text-[10px] bg-zinc-100 border border-zinc-200 text-zinc-700 px-1.5 py-0.5 rounded-lg inline-block font-sans">
+                                                    📦 {item.name} <strong className="text-zinc-900 font-extrabold">x{item.quantity}</strong>{' '}
+                                                    <span className="text-[9px] text-zinc-400 italic">({item.restaurantName})</span>
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            )}
+                                            {parsedDesc.invoiceImages && parsedDesc.invoiceImages.length > 0 && (
+                                              <div className="flex flex-wrap gap-1 mt-1">
+                                                {parsedDesc.invoiceImages.map((img: string, i: number) => (
+                                                  <a
+                                                    key={i}
+                                                    href={img}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="inline-block relative w-7 h-7 border border-zinc-200 rounded-md overflow-hidden hover:opacity-85"
+                                                    title={language === 'ar' ? 'عرض الفاتورة' : 'View Invoice'}
+                                                  >
+                                                    <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                                  </a>
+                                                ))}
+                                              </div>
+                                            )}
+                                            
+                                            {/* Customer Name and phone details badge */}
+                                            {(parsedDesc.customerName || parsedDesc.customerPhone) && (
+                                              <div className="bg-zinc-50 border border-zinc-150 rounded-lg p-1.5 px-2 mt-1.5 text-[10px] text-zinc-600 flex flex-col gap-0.5">
+                                                <span className="text-[8px] text-violet-500 font-extrabold uppercase tracking-wide block">
+                                                  👤 {language === 'ar' ? 'العميل المستلم:' : 'Recipient:'}
+                                                </span>
+                                                {parsedDesc.customerName && (
+                                                  <span className="font-extrabold text-zinc-900 block">{parsedDesc.customerName}</span>
+                                                )}
+                                                {parsedDesc.customerPhone && (
+                                                  <span className="font-mono text-zinc-500 block">{parsedDesc.customerPhone}</span>
+                                                )}
+                                              </div>
+                                            )}
+
+                                            {!parsedDesc.text && (!parsedDesc.items || parsedDesc.items.length === 0) && (!parsedDesc.invoiceImages || parsedDesc.invoiceImages.length === 0) && (!parsedDesc.customerName && !parsedDesc.customerPhone) && (
+                                              <span className="text-zinc-300">-</span>
+                                            )}
+                                          </div>
+                                        </td>
                                         <td className="px-5 py-4 text-zinc-500 max-w-xs truncate">{locVal}</td>
                                         <td className="px-5 py-4 font-mono font-bold text-zinc-800">{priceVal} {language === 'ar' ? 'ر.ي' : 'YER'}</td>
                                         <td className="px-5 py-4 text-end">

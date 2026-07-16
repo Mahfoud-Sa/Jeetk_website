@@ -3,6 +3,32 @@ import { Clock, Calendar, History, Edit, Trash2, ChevronUp, ChevronDown } from '
 import { useLanguage } from '../../context/LanguageContext';
 import { UserRole } from '../../types';
 
+export const parseOrderDescription = (descString: string) => {
+  try {
+    const parsed = JSON.parse(descString);
+    if (parsed && typeof parsed === 'object') {
+      return {
+        text: parsed.text || '',
+        items: Array.isArray(parsed.items) ? parsed.items : [],
+        invoiceImages: Array.isArray(parsed.invoiceImages) ? parsed.invoiceImages : [],
+        customerName: parsed.customerName || '',
+        customerPhone: parsed.customerPhone || '',
+        customerEmail: parsed.customerEmail || ''
+      };
+    }
+  } catch (e) {
+    // Normal string
+  }
+  return {
+    text: descString || '',
+    items: [],
+    invoiceImages: [],
+    customerName: '',
+    customerPhone: '',
+    customerEmail: ''
+  };
+};
+
 export const OrderManagement = ({ role, orders, users = [], onUpdateStatus, onEdit, onDelete, onViewHistory }: { role: UserRole, orders: any[], users?: any[], onUpdateStatus: (id: number, status: string) => void, onEdit?: (order: any) => void, onDelete?: (id: number) => void, onViewHistory?: (id: number) => void }) => {
   const { t, language } = useLanguage();
   const [updatingId, setUpdatingId] = useState<number | null>(null);
@@ -104,9 +130,77 @@ export const OrderManagement = ({ role, orders, users = [], onUpdateStatus, onEd
                     <div>{orderId}</div>
                   </td>
                   <td className="px-6 py-4 text-sm">
-                    <div className="max-w-[200px] truncate" title={order.description || order.Description}>
-                      {order.description || order.Description}
-                    </div>
+                    {(() => {
+                      const parsed = parseOrderDescription(order.description || order.Description || '');
+                      return (
+                        <div className="space-y-1.5 flex flex-col justify-start">
+                          {parsed.text && (
+                            <span className="font-extrabold text-zinc-900 block" title={parsed.text}>
+                              {parsed.text}
+                            </span>
+                          )}
+                          {parsed.items && parsed.items.length > 0 && (
+                            <div className="flex flex-wrap gap-1 max-w-[280px]">
+                              {parsed.items.map((item: any, i: number) => (
+                                <span key={i} className="text-[11px] bg-zinc-50 border border-zinc-250 p-1 px-2 rounded-lg text-zinc-700 block font-sans">
+                                  📦 {item.name}{' '}
+                                  <strong className="text-indigo-600 font-extrabold">x{item.quantity}</strong>{' '}
+                                  <span className="text-zinc-400 font-mono text-[9px]">
+                                    ({item.price} {language === 'ar' ? 'ر.س' : 'SAR'})
+                                  </span>{' '}
+                                  <span className="text-[9px] text-zinc-400 block sm:inline italic">
+                                    - {item.restaurantName}
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {parsed.invoiceImages && parsed.invoiceImages.length > 0 && (
+                            <div className="flex flex-col gap-1 mt-1 text-start">
+                              <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider block">
+                                {language === 'ar' ? '📑 الفواتير والايصالات المرفقة:' : '📑 Attached Receipts:'}
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {parsed.invoiceImages.map((img: string, i: number) => (
+                                  <a
+                                    key={i}
+                                    href={img}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="block relative w-9 h-9 border border-zinc-200 rounded-lg overflow-hidden hover:border-indigo-500 transition-all shadow-3xs group shrink-0"
+                                    title={language === 'ar' ? 'عرض الفاتورة' : 'View Invoice'}
+                                  >
+                                    <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                      <span className="text-[8px] text-white font-black">🔎</span>
+                                    </div>
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Customer Details info */}
+                          {(parsed.customerName || parsed.customerPhone) && (
+                            <div className="bg-zinc-50/80 border border-zinc-150 rounded-xl p-2 px-3 mt-1.5 text-xs text-zinc-700 flex flex-col gap-0.5 max-w-[280px]">
+                              <span className="text-[9px] text-violet-500 font-black uppercase tracking-wider block">
+                                👤 {language === 'ar' ? 'العميل المستلم:' : 'Customer Recipient:'}
+                              </span>
+                              {parsed.customerName && (
+                                <span className="font-extrabold text-zinc-950 block">{parsed.customerName}</span>
+                              )}
+                              {parsed.customerPhone && (
+                                <span className="font-mono text-[11px] text-zinc-500 font-bold block">{parsed.customerPhone}</span>
+                              )}
+                            </div>
+                          )}
+
+                          {!parsed.text && (!parsed.items || parsed.items.length === 0) && (!parsed.invoiceImages || parsed.invoiceImages.length === 0) && (!parsed.customerName && !parsed.customerPhone) && (
+                            <span className="text-zinc-300">-</span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4 text-sm text-zinc-500">
                     {(() => {

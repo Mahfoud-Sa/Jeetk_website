@@ -15,6 +15,32 @@ import { fetchWorkingDays, createWorkingDay, deleteWorkingDay, WorkingDay } from
 import { Order } from '../types';
 import { ShoppingBag, ChevronRight, Activity, TrendingUp } from 'lucide-react';
 
+const parseOrderDescription = (descString: string) => {
+  try {
+    const parsed = JSON.parse(descString);
+    if (parsed && typeof parsed === 'object') {
+      return {
+        text: parsed.text || '',
+        items: Array.isArray(parsed.items) ? parsed.items : [],
+        invoiceImages: Array.isArray(parsed.invoiceImages) ? parsed.invoiceImages : [],
+        customerName: parsed.customerName || '',
+        customerPhone: parsed.customerPhone || '',
+        customerEmail: parsed.customerEmail || ''
+      };
+    }
+  } catch (e) {
+    // Normal string
+  }
+  return {
+    text: descString || '',
+    items: [],
+    invoiceImages: [],
+    customerName: '',
+    customerPhone: '',
+    customerEmail: ''
+  };
+};
+
 interface DocumentFile {
   id: string;
   nameAr: string;
@@ -658,10 +684,73 @@ export function UserMinimumDashboardPage() {
                         >
                           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-zinc-100">
                             <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-xs font-bold text-zinc-400">#{order.id}</span>
-                                <h5 className="font-extrabold text-sm text-zinc-900">{order.description || (language === 'ar' ? 'طلب توصيل' : 'Delivery Assignment')}</h5>
-                              </div>
+                              {(() => {
+                                const parsed = parseOrderDescription(order.description || '');
+                                return (
+                                  <div className="space-y-1.5 flex flex-col justify-start">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-xs font-bold text-zinc-400">#{order.id}</span>
+                                      <h5 className="font-extrabold text-sm text-zinc-900">
+                                        {parsed.text || (language === 'ar' ? 'طلب توصيل' : 'Delivery Assignment')}
+                                      </h5>
+                                    </div>
+                                    {parsed.items && parsed.items.length > 0 && (
+                                      <div className="flex flex-col gap-1 mt-1 text-xs">
+                                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">
+                                          {language === 'ar' ? '📦 محتويات الطلب:' : '📦 Ordered Items:'}
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                          {parsed.items.map((item: any, i: number) => (
+                                            <span key={i} className="text-[11px] bg-zinc-50 border border-zinc-200 p-1 px-2 rounded-lg text-zinc-700 block font-sans">
+                                              {item.name} <strong className="text-zinc-900 font-extrabold">x{item.quantity}</strong>{' '}
+                                              <span className="text-[9px] text-zinc-400 font-mono">({item.price} {language === 'ar' ? 'ر.س' : 'SAR'})</span>{' '}
+                                              <span className="text-[9px] text-zinc-400 italic font-medium">- {item.restaurantName}</span>
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {parsed.invoiceImages && parsed.invoiceImages.length > 0 && (
+                                      <div className="flex flex-col gap-1 mt-1.5 text-xs">
+                                        <p className="text-[10px] font-black text-violet-500 uppercase tracking-wider">
+                                          {language === 'ar' ? '📑 الفواتير والايصالات المرفقة:' : '📑 Attached Receipts & Invoices:'}
+                                        </p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {parsed.invoiceImages.map((img: string, i: number) => (
+                                            <a
+                                              key={i}
+                                              href={img}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="block relative w-9 h-9 border border-zinc-300 rounded-lg overflow-hidden hover:opacity-85 shadow-3xs transition-opacity"
+                                              title={language === 'ar' ? 'عرض الفاتورة' : 'View Invoice'}
+                                            >
+                                              <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                            </a>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Customer recipient details block */}
+                                    {(parsed.customerName || parsed.customerPhone) && (
+                                      <div className="flex flex-col gap-1 mt-1.5 text-xs">
+                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">
+                                          👤 {language === 'ar' ? 'تفاصيل العميل المستلم:' : 'Recipient Customer Details:'}
+                                        </p>
+                                        <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-2.5 px-3 space-y-0.5 text-start inline-block max-w-[280px]">
+                                          {parsed.customerName && (
+                                            <p className="font-extrabold text-zinc-900">{parsed.customerName}</p>
+                                          )}
+                                          {parsed.customerPhone && (
+                                            <p className="font-mono text-zinc-500 text-[11px] font-bold">{parsed.customerPhone}</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                               <p className="text-[10px] text-zinc-400 mt-1 font-mono">
                                 {order.createdAt ? new Date(order.createdAt).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US') : 'N/A'}
                               </p>
